@@ -2,7 +2,9 @@ package com.fmotech.chess;
 
 import org.junit.Test;
 
-import static com.fmotech.chess.DebugUtils.*;
+import static com.fmotech.chess.DebugUtils.CHESS;
+import static com.fmotech.chess.DebugUtils.createBlackBoard;
+import static com.fmotech.chess.DebugUtils.createWhiteBoard;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -42,7 +44,7 @@ public class BoardTest {
 
     @Test
     public void pawnMoveWhite() {
-        assertBoard(Board.INIT.move(w("e2"), w("e3")),
+        assertBoard(Board.INIT.move(w("e2e3")),
                 createWhiteBoard(
                         "r n b q·k·b n r",
                         "p p p p p p p p",
@@ -56,7 +58,7 @@ public class BoardTest {
 
     @Test
     public void pawnMoveBlack() {
-        assertBoard(Board.INIT.nextTurn().move(b("b7"), b("b6")),
+        assertBoard(Board.INIT.nextTurn().move(b("b7b6")),
                 createBlackBoard(
                         "r n b q·k·b n r",
                         "p   p p p p p p",
@@ -70,7 +72,7 @@ public class BoardTest {
 
     @Test
     public void pawnJumpWhite() {
-        assertBoard(Board.INIT.move(w("d2"), w("d4")),
+        assertBoard(Board.INIT.move(w("d2d4")),
                 createWhiteBoard(
                         "r n b q·k·b n r",
                         "p p p p p p p p",
@@ -84,7 +86,7 @@ public class BoardTest {
 
     @Test
     public void pawnJumpBlack() {
-        assertBoard(Board.INIT.nextTurn().move(b("h7"), b("h5")),
+        assertBoard(Board.INIT.nextTurn().move(b("h7h5")),
                 createBlackBoard(
                         "r n b q·k·b n r",
                         "p p p p p p p  ",
@@ -98,7 +100,7 @@ public class BoardTest {
 
     @Test
     public void pawnKillsNormalWhite() {
-        assertBoard(MIDDLE_GAME_WHITE.move(w("c4"), w("d5")),
+        assertBoard(MIDDLE_GAME_WHITE.move(w("c4d5")),
                 createWhiteBoard(
                         "r      ·k·    r",
                         "P p   p   p p  ",
@@ -112,7 +114,7 @@ public class BoardTest {
 
     @Test
     public void pawnKillsNormalBlack() {
-        assertBoard(MIDDLE_GAME_BLACK.move(b("c5"), b("b4")),
+        assertBoard(MIDDLE_GAME_BLACK.move(b("c5b4")),
                 createBlackBoard(
                         "r      ·k·    r",
                         "P p   p   p p  ",
@@ -126,7 +128,7 @@ public class BoardTest {
 
     @Test
     public void pawnKillsEnPassantWhite() {
-        assertBoard(MIDDLE_GAME_WHITE.move(w("b5"), w("c6")),
+        assertBoard(MIDDLE_GAME_WHITE.move(w("b5c6")),
                 createWhiteBoard(
                         "r      ·k·    r",
                         "P p   p   p p  ",
@@ -140,7 +142,7 @@ public class BoardTest {
 
     @Test
     public void pawnKillsEnPassantBlack() {
-        assertBoard(MIDDLE_GAME_BLACK.move(b("h4"), b("g3")),
+        assertBoard(MIDDLE_GAME_BLACK.move(b("h4g3")),
                 createBlackBoard(
                         "r      ·k·    r",
                         "P p   p   p p  ",
@@ -154,7 +156,7 @@ public class BoardTest {
 
     @Test
     public void pawnPromotesBlack() {
-        assertBoard(MIDDLE_GAME_BLACK.move(b("b2"), b("b1")),
+        assertBoard(MIDDLE_GAME_BLACK.move(b("b2b1")),
                 createBlackBoard(
                         "r      ·k·    r",
                         "P p   p   p p  ",
@@ -168,7 +170,7 @@ public class BoardTest {
 
     @Test
     public void pawnKillsAndPromotesBlack() {
-        assertBoard(MIDDLE_GAME_BLACK.move(b("b2"), b("a1")),
+        assertBoard(MIDDLE_GAME_BLACK.move(b("b2a1")),
                 createBlackBoard(
                         "r      ·k·    r",
                         "P p   p   p p  ",
@@ -182,7 +184,7 @@ public class BoardTest {
 
     @Test
     public void knightMoveWhite() {
-        assertBoard(Board.INIT.move(w("b1"), w("c3")),
+        assertBoard(Board.INIT.move(w("b1c3")),
                 createWhiteBoard(
                         "r n b q·k·b n r",
                         "p p p p p p p p",
@@ -196,7 +198,7 @@ public class BoardTest {
 
     @Test
     public void knightMoveBlack() {
-        assertBoard(Board.INIT.nextTurn().move(b("b8"), b("c6")),
+        assertBoard(Board.INIT.nextTurn().move(b("b8c6")),
                 createBlackBoard(
                         "r   b q·k·b n r",
                         "p p p p p p p p",
@@ -211,9 +213,9 @@ public class BoardTest {
     @Test
     public void rockMovesWhite() {
         Board board = Board.INIT
-                .move(w("a2"), w("a3")).nextTurn()
-                .move(b("a7"), b("a6")).nextTurn()
-                .move(w("a1"), w("a2"));
+                .move(w("a2a3")).nextTurn()
+                .move(b("a7a6")).nextTurn()
+                .move(w("a1a2"));
         assertBoard(board,
                 createWhiteBoard(
                         "r n b q·k·b n r",
@@ -228,7 +230,7 @@ public class BoardTest {
 
     @Test
     public void castleKingWhite() {
-        assertBoard(CASTLE.move(w("e1"), w("g1")),
+        assertBoard(CASTLE.move(w("e1g1")),
                 createWhiteBoard(
                         "r      ·k·    r",
                         "p   p p q p b  ",
@@ -242,7 +244,7 @@ public class BoardTest {
 
     @Test
     public void castleQueenWhite() {
-        assertBoard(CASTLE.move(w("e1"), w("c1")),
+        assertBoard(CASTLE.move(w("e1c1")),
                 createWhiteBoard(
                         "r      ·k·    r",
                         "p   p p q p b  ",
@@ -256,7 +258,7 @@ public class BoardTest {
 
     @Test
     public void castleKingBlack() {
-        assertBoard(CASTLE.nextTurn().move(b("e8"), b("g8")),
+        assertBoard(CASTLE.nextTurn().move(b("e8g8")),
                 createBlackBoard(
                         "r         r k  ",
                         "p   p p q p b  ",
@@ -270,7 +272,7 @@ public class BoardTest {
 
     @Test
     public void castleQueenBlack() {
-        assertBoard(CASTLE.nextTurn().move(b("e8"), b("c8")),
+        assertBoard(CASTLE.nextTurn().move(b("e8c8")),
                 createBlackBoard(
                         "    k r       r",
                         "p   p p q p b  ",
@@ -282,6 +284,14 @@ public class BoardTest {
                         "R      ·K·    R"));
     }
 
+    private int w(String move) {
+        return FenFormatter.moveFromFen(Board.INIT, move);
+    }
+
+    private int b(String move) {
+        return FenFormatter.moveFromFen(Board.INIT.nextTurn(), move);
+    }
+
     @Test
     public void castle() {
         assertTrue(CASTLE.castleLow());
@@ -291,7 +301,6 @@ public class BoardTest {
     }
 
     public static void assertBoard(Board actual, Board expected) {
-        DebugUtils.debug(CHESS, actual);
         assertEquals(expected, actual);
     }
 }

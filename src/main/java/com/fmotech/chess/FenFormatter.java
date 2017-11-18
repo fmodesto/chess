@@ -1,10 +1,19 @@
 package com.fmotech.chess;
 
+import java.util.Arrays;
+
 import static com.fmotech.chess.BitOperations.lowestBitPosition;
 import static com.fmotech.chess.BitOperations.nextLowestBit;
+import static com.fmotech.chess.Board.MOVE_PROMO;
+import static java.lang.Math.abs;
 import static org.apache.commons.lang3.StringUtils.normalizeSpace;
+import static org.apache.commons.lang3.StringUtils.substring;
 
 public class FenFormatter {
+
+    private static final int[] FROM_PROMO = createFromPromos();
+    private static final String[] TO_TILE = createToTiles();
+    private static final String[] TO_PROMO = createToPromos();
 
     public static Board fromFen(String fen) {
         String[] parts = normalizeSpace(fen).split("\\s+");
@@ -101,5 +110,52 @@ public class FenFormatter {
         if (p != 0) sb.append(p);
         sb.append(c);
         return 0;
+    }
+
+    public static String moveToFen(Board board, int move) {
+        int pos = board.whiteTurn() ? 0 : 63;
+        int src = abs(pos - (move & 0xFF));
+        int tgt = abs(pos - ((move >>> 8) & 0xFF));
+        int promo = (move >>> 24) & 0x07;
+        return TO_TILE[src] + TO_TILE[tgt] + TO_PROMO[promo];
+    }
+
+    public static int moveFromFen(Board board, String move) {
+        int pos = board.whiteTurn() ? 0 : 63;
+        int src = abs(pos - tile(substring(move, 0, 2)));
+        int tgt = abs(pos - tile(substring(move, 2, 4)));
+        int promo = move.length() == 5 ? MOVE_PROMO | FROM_PROMO[move.charAt(4)] : 0;
+        return promo << 24 | tgt << 8 | src;
+    }
+
+    private static int tile(String tile) {
+        return 8 * (tile.charAt(1) - '1') + (7 - (tile.charAt(0) - 'a'));
+    }
+
+    private static int[] createFromPromos() {
+        int[] table = new int[256];
+        table['q'] = table['Q'] = Board.QUEEN;
+        table['r'] = table['R'] = Board.ROCK;
+        table['b'] = table['B'] = Board.BISHOP;
+        table['n'] = table['N'] = Board.KNIGHT;
+        return table;
+    }
+
+    private static String[] createToTiles() {
+        String[] table = new String[64];
+        for (int i = 0; i < 64; i++) {
+            table[i] = "" + (char) ((7 - i % 8) + 'a') + (char) ((i / 8) + '1');
+        }
+        return table;
+    }
+
+    private static String[] createToPromos() {
+        String[] table = new String[8];
+        Arrays.fill(table, "");
+        table[Board.QUEEN] = "q";
+        table[Board.ROCK] = "r";
+        table[Board.BISHOP] = "b";
+        table[Board.KNIGHT] = "n";
+        return table;
     }
 }

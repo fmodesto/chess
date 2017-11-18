@@ -3,22 +3,22 @@ package com.fmotech.chess;
 import static com.fmotech.chess.DebugUtils.*;
 
 public class MoveTables {
-    public static final long[] PAWN = computePawn();
-    public static final long[] PAWN_ATTACK = computePawnAttack();
+    public static final long[] PAWN_TABLE = computePawn();
+    public static final long[] PAWN_ATTACK_TABLE = computePawnAttack();
 
-    public static final long[] ROCK_HIGH = computeRockHigh();
-    public static final long[] ROCK_LOW = computeRockLow();
+    public static final long[] ROCK_HIGH_TABLE = computeRockHigh();
+    public static final long[] ROCK_LOW_TABLE = computeRockLow();
 
-    public static final long[] BISHOP_HIGH = computeBishopHigh();
-    public static final long[] BISHOP_LOW = computeBishopLow();
+    public static final long[] BISHOP_HIGH_TABLE = computeBishopHigh();
+    public static final long[] BISHOP_LOW_TABLE = computeBishopLow();
 
-    public static final long[] KNIGHT = computeKnight();
+    public static final long[] KNIGHT_TABLE = computeKnight();
 
-    public static final long[] KING = computeKing();
+    public static final long[] KING_TABLE = computeKing();
 
     public static void main(String[] args) {
         for (int i = 0; i < 64; i++) {
-            long board = KNIGHT[i];
+            long board = KNIGHT_TABLE[i];
             DebugUtils.debug(CHESS, Board.KNIGHT, board);
         }
     }
@@ -211,7 +211,7 @@ public class MoveTables {
     private static long computeLeft() {
         long left = 0;
         for (int i = 0; i < 8; i++) {
-            left |= 1L << ((8 * i) + 7);
+            left |= 1L << ((8L * i) + 7);
         }
         return left;
     }
@@ -219,7 +219,7 @@ public class MoveTables {
     private static long computeRight() {
         long right = 0;
         for (int i = 0; i < 8; i++) {
-            right |= 1L << (8 * i);
+            right |= 1L << (8L * i);
         }
         return right;
     }

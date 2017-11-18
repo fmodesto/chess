@@ -7,30 +7,26 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Random;
 import java.util.Scanner;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static com.fmotech.chess.DebugUtils.b;
-import static com.fmotech.chess.DebugUtils.w;
 import static com.fmotech.chess.FenFormatter.fromFen;
-import static org.apache.commons.lang3.StringUtils.*;
+import static com.fmotech.chess.FenFormatter.moveFromFen;
+import static com.fmotech.chess.FenFormatter.moveToFen;
+import static org.apache.commons.lang3.StringUtils.defaultString;
+import static org.apache.commons.lang3.StringUtils.lowerCase;
+import static org.apache.commons.lang3.StringUtils.split;
+import static org.apache.commons.lang3.StringUtils.substringAfter;
+import static org.apache.commons.lang3.StringUtils.substringBefore;
 
 @SuppressWarnings("unused")
 public class UciProtocol {
 
-    public static final int[] PROMOS = createPromos();
     private static Board board;
-
-    private static int[] createPromos() {
-        int[] data = new int[256];
-        data['q'] = data['Q'] = Board.QUEEN;
-        data['r'] = data['R'] = Board.ROCK;
-        data['b'] = data['B'] = Board.BISHOP;
-        data['n'] = data['N'] = Board.KNIGHT;
-        return data;
-    }
+    private static Random random = new Random();
 
     private static Map<String, Method> commands;
 
@@ -75,27 +71,15 @@ public class UciProtocol {
         String moves = substringAfter(parameter, "moves");
         board = initial.startsWith("fen") ? fromFen(substringAfter(initial, "fen")) : Board.INIT;
         for (String move : split(moves, " ")) {
-            boolean turn = board.whiteTurn();
-            long src = mask(turn, substring(move, 0, 2));
-            long tgt = mask(turn, substring(move, 2, 4));
-            if (move.length() == 4) {
-                board = board.move(src, tgt).nextTurn();
-            } else {
-                board = board.move(src, tgt, PROMOS[move.charAt(4)]).nextTurn();
-            }
+            board = board.move(moveFromFen(board, move)).nextTurn();
         }
         send(moves);
     }
 
     public static void go(String parameter) {
-        long[] moves = board.moves();
+        int[] moves = board.moves();
         int c = MoveGenerator.generateValidMoves(board, moves);
-
-        send("bestmove a1a8");
-    }
-
-    private static long mask(boolean turn, String move) {
-        return turn ? w(move) : b(move);
+        send("bestmove " + moveToFen(board, moves[random.nextInt(c)]));
     }
 
     public static void quit(String parameter) {

@@ -47,6 +47,18 @@ public class DebugUtils {
         return whiteTurn ? board : board.nextTurn();
     }
 
+    public static void debugPerft(Board board, int level) {
+        int[] moves = board.moves();
+        int counter = MoveGenerator.generateValidMoves(board, moves);
+        long total = 0;
+        for (int i = 0; i < counter; i++) {
+            long c = MoveGenerator.countMoves(level - 1, board.move(moves[i]).nextTurn());
+            total += c;
+            System.out.println(FenFormatter.moveToFen(board, moves[i]) + ": " + c);
+        }
+        System.out.println("Total: " + total);
+    }
+
     public static void debug(String symbols, int type, long board) {
         debug(symbols, Board.of(0, test(type, 0b100) ? board : 0, test(type, 0b010) ? board : 0, test(type, 0b001) ? board : 0));
     }
@@ -62,15 +74,6 @@ public class DebugUtils {
         }
         System.out.println("  +---------------");
         System.out.println("   a b c d e f g h");
-    }
-
-    public static void debugUci(String symbols, Board board) {
-        String[] ranks = drawBoard(symbols, board).split("\n");
-        for (int i = 0; i < 8; i++) {
-            System.out.println("info: " + (8 - i) + " |" + ranks[i]);
-        }
-        System.out.println("info:   +---------------");
-        System.out.println("info:    a b c d e f g h");
     }
 
     private static String drawBoard(String symbols, Board board) {
@@ -99,29 +102,5 @@ public class DebugUtils {
             sb.replace(p, p + 1, "·");
         }
         return StringUtils.replaceChars(sb.toString(), FEN, symbols);
-    }
-
-    public static String toPosition(boolean whiteTurn, long bitBoard) {
-        int e = BitOperations.lowestBitPosition(whiteTurn ? bitBoard : BitOperations.reverse(bitBoard));
-        return "" + (char) ((7 - e % 8) + 'a') + (char) ((e / 8) + '1');
-    }
-
-    public static long w(String position) {
-        return 1L << ((7 - (position.charAt(0) - 'a')) + 8L * (position.charAt(1) - '1'));
-    }
-
-    public static long b(String position) {
-        return BitOperations.reverse(w(position));
-    }
-
-    public static void toAssert(String fen) {
-        toAssert(FenFormatter.fromFen(fen));
-    }
-
-    public static void toAssert(Board board) {
-        String[] ranks = drawBoard(FEN, board).split("\n");
-        for (int i = 0; i < 8; i++) {
-            System.out.println("\"" + ranks[i] + "\",");
-        }
     }
 }

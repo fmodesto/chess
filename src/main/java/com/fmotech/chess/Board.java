@@ -13,8 +13,8 @@ public class Board {
     private static final long RANK_1 = 0x00_00_00_00_00_00_00_ffL;
     private static final long RANK_8 = 0xff_00_00_00_00_00_00_00L;
 
-    public static final long LOW_ROCK = 1L;
-    public static final long HIGH_ROCK = 1L << 7;
+    private static final long LOW_ROCK = 1L;
+    private static final long HIGH_ROCK = 1L << 7;
 
     public static final int PAWN = 0b001;
     public static final int ROCK = 0b110;
@@ -22,6 +22,13 @@ public class Board {
     public static final int BISHOP = 0b011;
     public static final int QUEEN = 0b100;
     public static final int KING = 0b101;
+    public static final int SPECIAL = 0b111;
+
+    public static final int MOVE_CAST_H = 0x80;
+    public static final int MOVE_CAST_L = 0x40;
+    public static final int MOVE_EP_CAP = 0x20;
+    public static final int MOVE_EP = 0x10;
+    public static final int MOVE_PROMO = 0x08;
 
     public static final Board INIT = Board.of(
             0xffff000000000000L,
@@ -30,7 +37,7 @@ public class Board {
             0x2cff00000000ff2cL | CASTLE);
 
     private Board next;
-    private long[] moves = new long[32];
+    private int[] moves = new int[256];
     private long b4;
     private long b3;
     private long b2;
@@ -66,12 +73,19 @@ public class Board {
         return nextBoard().set(reverse(~b4), reverse(b3), reverse(b2), reverse(b1));
     }
 
-    public long[] moves() {
+    public int[] moves() {
         Arrays.fill(moves, 0);
         return moves;
     }
 
-    public Board move(long src, long dest) {
+    public Board move(int move) {
+        long src = 1L << (move & 0xFF);
+        long dest = 1L << ((move >>> 8) & 0xFF);
+        int promotion = (move >>> 24) & 0x07;
+        return move(src, dest, promotion);
+    }
+
+    public Board move(long src, long dest, int promotion) {
         if ((src & ownPawns()) != 0) {
             long oldEnPassant = enPassant();
             long newEnPassant = (src << 8) & (dest >>> 8);
@@ -81,11 +95,14 @@ public class Board {
             long b3 = this.b3 & clear;
             long b2 = this.b2 & clear;
             long b1 = this.b1 & clear;
-            long promotion = dest & RANK_8;
+            promotion = promotion == 0 && (dest & RANK_8) != 0 ? QUEEN : promotion;
+            long p3 = promotion == 0 ? 0 : (promotion >> 2 & 1) * dest;
+            long p2 = promotion == 0 ? 0 : (promotion >> 1 & 1) * dest;
+            long p1 = promotion == 0 ? dest : (promotion & 1) * dest;
             b4 |= whiteTurn() ? 0 : src | enPassantKill | (oldEnPassant & ~dest);
-            b3 |= newEnPassant | promotion;
-            b2 |= newEnPassant;
-            b1 |= newEnPassant | (dest ^ promotion);
+            b3 |= newEnPassant | p3;
+            b2 |= newEnPassant | p2;
+            b1 |= newEnPassant | p1;
             return nextBoard().set(b4, b3, b2, b1);
         } else if ((src & b3 & b1 & RANK_1) != 0) {
             if (src == ownKing()) {
@@ -134,20 +151,6 @@ public class Board {
         }
     }
 
-    public Board move(long src, long dest, int promotion) {
-        long oldEnPassant = enPassant();
-        long clear = ~(src | dest | oldEnPassant);
-        long b4 = this.b4 & clear;
-        long b3 = this.b3 & clear;
-        long b2 = this.b2 & clear;
-        long b1 = this.b1 & clear;
-        b4 |= whiteTurn() ? 0 : src | oldEnPassant;
-        b3 |= (promotion >> 2 & 1) * dest;
-        b2 |= (promotion >> 1 & 1) * dest;
-        b1 |= (promotion & 1) * dest;
-        return nextBoard().set(b4, b3, b2, b1);
-    }
-
     public boolean whiteTurn() {
         return  (b4 & ~(b3 | b2 | b1)) == 0;
     }
@@ -180,10 +183,9 @@ public class Board {
         return ((castle() & HIGH_ROCK) == HIGH_ROCK) && ((pieces() & (0x70 | ownKing())) == ownKing());
     }
 
-    public int type(long piece) {
-        return (int) ((((b3 & piece) / piece) & 1) << 3
-                | (((b2 & piece) / piece) & 1) << 2
-                | (((b1 & piece) / piece) & 1));
+    public int type(int pos, int castle, int enPassant) {
+        int type = (int) (((b3 >>> pos) & 1) << 2 | ((b2 >>> pos) & 1) << 1 | ((b1 >>> pos) & 1));
+        return type != SPECIAL ? type : ((1 << pos) & CASTLE) != 0 ? castle : enPassant;
     }
 
     // Own pieces
@@ -269,25 +271,6 @@ public class Board {
 
     @Override
     public String toString() {
-        return FenFormatter.toFen(this) + " " + leftPad(Long.toHexString(b4), 8, '0')
-                + " " + leftPad(Long.toHexString(b3), 8, '0')
-                + " " + leftPad(Long.toHexString(b2), 8, '0')
-                + " " + leftPad(Long.toHexString(b1), 8, '0');
-    }
-
-    public String debugString() {
-        String s4 = leftPad(Long.toBinaryString(b4), 64, '0');
-        String s3 = leftPad(Long.toBinaryString(b3), 64, '0');
-        String s2 = leftPad(Long.toBinaryString(b2), 64, '0');
-        String s1 = leftPad(Long.toBinaryString(b1), 64, '0');
-
-        StringBuilder sb = new StringBuilder();
-        for (int j = 0; j < 8; j++) {
-            sb.append(substring(s4, 8 * j, 8 * j + 8)).append(" ")
-                    .append(substring(s3, 8 * j, 8 * j + 8)).append(" ")
-                    .append(substring(s2, 8 * j, 8 * j + 8)).append(" ")
-                    .append(substring(s1, 8 * j, 8 * j + 8)).append("\n");
-        }
-        return sb.subSequence(0, sb.length() - 1).toString();
+        return FenFormatter.toFen(this) + " " + leftPad(Long.toHexString(b4), 8, '0');
     }
 }

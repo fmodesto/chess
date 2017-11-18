@@ -52,7 +52,6 @@ public class Sorter {
 
         List<Game> gg = games.entrySet().stream()
                 .map(Map.Entry::getValue)
-//                .filter(e -> e.stream().map(f -> f.result).distinct().count() == 1)
                 .map(Sorter::aggregate)
                 .collect(Collectors.toList());
 

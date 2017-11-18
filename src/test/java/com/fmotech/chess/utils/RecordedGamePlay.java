@@ -1,5 +1,8 @@
-package com.fmotech.chess;
+package com.fmotech.chess.utils;
 
+import com.fmotech.chess.Board;
+import com.fmotech.chess.DebugUtils;
+import com.fmotech.chess.MoveGenerator;
 import com.fmotech.chess.utils.PgnFormatter.Game;
 import com.fmotech.chess.utils.PgnFormatter.GameResult;
 
@@ -10,15 +13,13 @@ import java.nio.file.Paths;
 import static com.fmotech.chess.DebugUtils.*;
 import static java.lang.Integer.parseInt;
 import static org.apache.commons.lang3.StringUtils.*;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 public class RecordedGamePlay {
 
     private static final long FILE_1 = computeLeft();
 
     public static void main(String[] args) throws IOException {
-        Files.lines(Paths.get("src/test/resources/all.txt"))
+        Files.lines(Paths.get("src/test/resources/games.txt"))
 //                .limit(10)
                 .map(e -> split(e, "\t"))
                 .map(e -> new Game(GameResult.valueOf(e[0]), parseInt(e[1]), parseInt(e[2]), split(e[3], " ")))
@@ -32,6 +33,7 @@ public class RecordedGamePlay {
                 board = move(board, move);
             }
         } catch (Exception e) {
+            System.out.println(e.getMessage());
             for (int i = 0; i < game.moves.length; i++) {
                 if (i % 2 == 0) {
                     System.out.print((1+(i/2)) + ". ");
@@ -70,7 +72,7 @@ public class RecordedGamePlay {
         boolean whiteTurn = board.whiteTurn();
         boolean capture = rawMove.contains("x");
         boolean check = rawMove.contains("+");
-        boolean mater = rawMove.contains("#");
+        boolean mate = rawMove.contains("#");
         boolean promotion = rawMove.contains("=");
         String move = remove(remove(remove(remove(rawMove, 'x'), '+'), '#'), '=');
         if (Character.isLowerCase(move.charAt(0))) move = "P" + move;
@@ -79,76 +81,79 @@ public class RecordedGamePlay {
         if (promotion) move = substring(move, 0, -1);
         long src = move(whiteTurn, substring(move, 1, -2));
         long tgt = move(whiteTurn, substring(move, -2));
-        long[] moves = board.moves();
+        int[] moves = board.moves();
         int counter = MoveGenerator.generateValidMoves(board, moves);
-        long[] m = new long[] { 0, 0 };
+        int m;
         if (whiteTurn && "O-O".equals(move) || !whiteTurn && "O-O-O".equals(move)) {
-            fillMove(m, board.ownKing(), board.ownKing() >>> 2, counter, moves, whiteTurn);
+            m = findMove(board.ownKing(), board.ownKing() >>> 2, counter, moves);
         } else if (whiteTurn && "O-O-O".equals(move) || !whiteTurn && "O-O".equals(move)) {
-            fillMove(m, board.ownKing(), board.ownKing() << 2, counter, moves, whiteTurn);
+            m = findMove(board.ownKing(), board.ownKing() << 2, counter, moves);
         } else if (type == 'K') {
-            fillMove(m, src & board.ownKing(), tgt, counter, moves, whiteTurn);
+            m = findMove(src & board.ownKing(), tgt, counter, moves);
         } else if (type == 'Q') {
-            fillMove(m, src & board.ownQueens(), tgt, counter, moves, whiteTurn);
+            m = findMove(src & board.ownQueens(), tgt, counter, moves);
         } else if (type == 'B') {
-            fillMove(m, src & board.ownBishops(), tgt, counter, moves, whiteTurn);
+            m = findMove( src & board.ownBishops(), tgt, counter, moves);
         } else if (type == 'N') {
-            fillMove(m, src & board.ownKnights(), tgt, counter, moves, whiteTurn);
+            m = findMove( src & board.ownKnights(), tgt, counter, moves);
         } else if (type == 'R') {
-            fillMove(m, src & board.ownRocks(), tgt, counter, moves, whiteTurn);
+            m = findMove( src & board.ownRocks(), tgt, counter, moves);
+        } else if (type == 'P' && promotion) {
+            m = findMove( src & board.ownPawns(), tgt, promo, counter, moves);
         } else if (type == 'P') {
-            fillMove(m, src & board.ownPawns(), tgt, counter, moves, whiteTurn);
-        }
-        if (promotion && promo == 'Q') {
-            return board.move(m[0], m[1], Board.QUEEN).nextTurn();
-        } else if (promotion && promo == 'R') {
-            return board.move(m[0], m[1], Board.ROCK).nextTurn();
-        } else if (promotion && promo == 'B') {
-            return board.move(m[0], m[1], Board.BISHOP).nextTurn();
-        } else if (promotion && promo == 'N') {
-            return board.move(m[0], m[1], Board.KNIGHT).nextTurn();
+            m = findMove( src & board.ownPawns(), tgt, counter, moves);
         } else {
-            return board.move(m[0], m[1]).nextTurn();
+            m = 0; // Pass?
         }
+        return board.move(m).nextTurn();
     }
 
     private static long move(boolean whiteTurn, String move) {
         if (move.length() == 0) {
             return -1;
-        } else if (move.length() == 1 && Character.isDigit(move.charAt(0))) {
-            long mask = 0xFFL << (8L * (move.charAt(0) - '1'));
-            return whiteTurn ? mask : Long.reverse(mask);
+        }
+        return whiteTurn ? createMask(move) : Long.reverse(createMask(move));
+    }
+
+    private static long createMask(String move) {
+        if (move.length() == 1 && Character.isDigit(move.charAt(0))) {
+            return 0xFFL << (8L * (move.charAt(0) - '1'));
         } else if (move.length() == 1) {
-            long mask = FILE_1 >>> (move.charAt(0) - 'a');
-            return whiteTurn ? mask : Long.reverse(mask);
+            return FILE_1 >>> (move.charAt(0) - 'a');
         } else {
-            return whiteTurn ? w(move) : b(move);
+            return 1L << ((7 - (move.charAt(0) - 'a')) + 8L * (move.charAt(1) - '1'));
         }
     }
 
-    private static void fillMove(long[] result, long srcMask, long tgtMask, int counter, long[] moves, boolean whiteTurn) {
-        for (int i = 0; i < counter; i += 2) {
-            if ((moves[i] & srcMask) != 0 && (moves[i + 1] & tgtMask) != 0) {
-                long src = moves[i] & srcMask;
-                long tgt = moves[i + 1] & tgtMask;
-                if (BitOperations.nextLowestBit(src) == 0 && BitOperations.nextLowestBit(tgt) == 0) {
-                    result[0] = src;
-                    result[1] = tgt;
-                    return;
-                }
+    private static int findMove(long srcMask, long tgtMask, char promo, int counter, int[] moves) {
+        int move = findMove(srcMask, tgtMask, counter, moves) & 0xF8FFFFFF;
+        switch (promo) {
+            case 'R':
+                return move | Board.ROCK << 24;
+            case 'B':
+                return move | Board.BISHOP << 24;
+            case 'N':
+                return move | Board.KNIGHT << 24;
+            default:
+                return move | Board.QUEEN << 24;
+        }
+    }
+
+    private static int findMove(long srcMask, long tgtMask, int counter, int[] moves) {
+        for (int i = 0; i < counter; i++) {
+            long src = 1L << (moves[i] & 0xFF);
+            long tgt = 1L << ((moves[i] >> 8) & 0xFF);
+            if ((src & srcMask) != 0 && (tgt & tgtMask) != 0) {
+                return moves[i];
             }
         }
         throw new IllegalStateException("Move not valid");
     }
 
-    private static void assertContainsMove(boolean whiteTurn, long src, long tgt, long[] moves, int counter) {
-        fail("Move not found: " + DebugUtils.toPosition(whiteTurn, src) + DebugUtils.toPosition(whiteTurn, tgt));
-    }
-
     private static long computeLeft() {
         long left = 0;
-        for (int i = 0; i < 8; i++) {
-            left |= 1L << ((8 * i) + 7);
+        for (long i = 0; i < 8; i++) {
+            left |= 1L << ((i * 8) + 7);
         }
         return left;
     }
