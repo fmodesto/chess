@@ -33,7 +33,7 @@ public class MoveTables {
 
     private static long[] computePawnAttack() {
         long leftMask = ~computeRight();
-        long rightMask = ~computLeft();
+        long rightMask = ~computeLeft();
         long[] positions = new long[64];
         for (int i = 0; i < 64; i++) {
             long p = 1L << i;
@@ -52,7 +52,7 @@ public class MoveTables {
 
     private static long[] computeRockHigh() {
         long up = computeUp();
-        long left = computLeft();
+        long left = computeLeft();
         long[] positions = new long[64];
         for (int i = 0; i < 64; i++) {
             long p = 1L << i;
@@ -96,7 +96,7 @@ public class MoveTables {
 
     private static long[] computeBishopHigh() {
         long up = computeUp();
-        long left = computLeft();
+        long left = computeLeft();
         long right = computeRight();
         long[] positions = new long[64];
         for (int i = 0; i < 64; i++) {
@@ -119,7 +119,7 @@ public class MoveTables {
 
     private static long[] computeBishopLow() {
         long down = computeDown();
-        long left = computLeft();
+        long left = computeLeft();
         long right = computeRight();
         long[] positions = new long[64];
         for (int i = 0; i < 64; i++) {
@@ -141,7 +141,7 @@ public class MoveTables {
     }
 
     private static long[] computeKnight() {
-        long left = computLeft();
+        long left = computeLeft();
         long right = computeRight();
         long leftMask = ~(right | right << 1);
         long rightMask = ~(left | left >>> 1);
@@ -169,7 +169,7 @@ public class MoveTables {
 
     private static long[] computeKing() {
         long leftMask = ~computeRight();
-        long rightMask = ~computLeft();
+        long rightMask = ~computeLeft();
         long[] positions = new long[64];
         for (int i = 0; i < 64; i++) {
             long p = 1L << i;
@@ -208,7 +208,7 @@ public class MoveTables {
         return down;
     }
 
-    private static long computLeft() {
+    private static long computeLeft() {
         long left = 0;
         for (int i = 0; i < 8; i++) {
             left |= 1L << ((8 * i) + 7);

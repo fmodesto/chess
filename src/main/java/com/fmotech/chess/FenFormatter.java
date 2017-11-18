@@ -1,11 +1,13 @@
 package com.fmotech.chess;
 
-import static com.fmotech.chess.BitOperations.*;
+import static com.fmotech.chess.BitOperations.lowestBitPosition;
+import static com.fmotech.chess.BitOperations.nextLowestBit;
+import static org.apache.commons.lang3.StringUtils.normalizeSpace;
 
 public class FenFormatter {
 
     public static Board fromFen(String fen) {
-        String[] parts = fen.split("\\s+");
+        String[] parts = normalizeSpace(fen).split("\\s+");
         boolean whiteTurn = "w".equals(parts[1]);
         long b = 1L << 63;
         long pawns = 0, rocks = 0, knights = 0, bishops = 0, queens = 0, kings = 0, color = 0, castle = 0, enPassant = 0;

@@ -26,18 +26,20 @@ public class MoveGenerator {
 //        System.out.printf("%10d in %6d ms\n", moves, MILLIS.between(start, now()));
 
 
-        execute(FenFormatter.fromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"));
-        execute(FenFormatter.fromFen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -"));
-        execute(FenFormatter.fromFen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -"));
-        execute(FenFormatter.fromFen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1"));
-        execute(FenFormatter.fromFen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"));
-        execute(FenFormatter.fromFen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10"));
+        for (int i = 0; i < 10; i++) {
+            execute(FenFormatter.fromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"));
+        }
+//        execute(FenFormatter.fromFen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -"));
+//        execute(FenFormatter.fromFen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -"));
+//        execute(FenFormatter.fromFen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1"));
+//        execute(FenFormatter.fromFen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"));
+//        execute(FenFormatter.fromFen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10"));
     }
 
     private static void execute(Board board) {
-        DebugUtils.debug(DebugUtils.CHESS, board);
+//        DebugUtils.debug(DebugUtils.CHESS, board);
         System.out.println(FenFormatter.toFen(board));
-        for (int i = 1; i <= 5; i++) {
+        for (int i = 1; i <= 6; i++) {
             LocalDateTime start = now();
             long moves = generateMoves(i, false, true, board);
             System.out.printf("%10d in %6d ms\n", moves, MILLIS.between(start, now()));
@@ -93,6 +95,26 @@ public class MoveGenerator {
         return scenarios;
     }
 
+    public static int generateValidMoves(Board board, long[] moves) {
+        int counter = generateDirtyMoves(board, moves);
+        for (int i = 0; i < counter; i += 2) {
+            long src = moves[i];
+            long next = moves[i + 1];
+            long valid = 0;
+            while (next != 0) {
+                long tgt = lowestBit(next);
+                Board nextBoard = board.move(src, tgt);
+                int kingPosition = lowestBitPosition(nextBoard.ownKing());
+                if (!isPositionInAttack(nextBoard, kingPosition)) {
+                    valid |= tgt;
+                }
+                next = nextLowestBit(next);
+            }
+            moves[i + 1] = valid;
+        }
+        return counter;
+    }
+
     public static int generateDirtyMoves(Board board, long[] moves) {
         int counter = 0;
         counter = generatePawnMoves(board, counter, moves);
@@ -111,7 +133,7 @@ public class MoveGenerator {
             long pawn = lowestBit(pawns);
             int pos = lowestBitPosition(pawns);
             long move = 0;
-            long next = PAWN[pos];
+            long next = pawn << 8;//PAWN[pos];
             if ((pieces & next) == 0) {
                 move |= next;
                 if ((pawn & PAWN_RANK) != 0) {

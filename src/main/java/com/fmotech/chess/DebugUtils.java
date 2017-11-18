@@ -64,6 +64,15 @@ public class DebugUtils {
         System.out.println("   a b c d e f g h");
     }
 
+    public static void debugUci(String symbols, Board board) {
+        String[] ranks = drawBoard(symbols, board).split("\n");
+        for (int i = 0; i < 8; i++) {
+            System.out.println("info: " + (8 - i) + " |" + ranks[i]);
+        }
+        System.out.println("info:   +---------------");
+        System.out.println("info:    a b c d e f g h");
+    }
+
     private static String drawBoard(String symbols, Board board) {
         String[] fen = FenFormatter.toFen(board).split(" ");
         StringBuilder sb = new StringBuilder();
