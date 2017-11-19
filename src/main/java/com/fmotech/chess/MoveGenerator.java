@@ -51,12 +51,16 @@ public class MoveGenerator {
         int index = 0;
         for (int i = 0; i < counter; i++) {
             Board nextBoard = board.move(moves[i]);
-            int kingPosition = lowestBitPosition(nextBoard.ownKing());
-            if (!isPositionInAttack(nextBoard, kingPosition)) {
+            if (isValid(nextBoard)) {
                 moves[index++] = moves[i];
             }
         }
         return index;
+    }
+
+    public static boolean isValid(Board board) {
+        int kingPosition = lowestBitPosition(board.ownKing());
+        return !isPositionInAttack(board, kingPosition);
     }
 
     public static int generateDirtyMoves(Board board, int[] moves) {

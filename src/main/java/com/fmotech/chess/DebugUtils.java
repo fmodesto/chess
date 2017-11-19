@@ -2,6 +2,11 @@ package com.fmotech.chess;
 
 import org.apache.commons.lang3.StringUtils;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+
+import static java.time.LocalDateTime.now;
+
 public class DebugUtils {
 
     public static final String CHESS = "♙♖♘♗♕♔♟♜♞♝♛♚";
@@ -102,5 +107,12 @@ public class DebugUtils {
             sb.replace(p, p + 1, "·");
         }
         return StringUtils.replaceChars(sb.toString(), FEN, symbols);
+    }
+
+    public static interface Thunk { void apply(); }
+    public static long timeExecuting(Thunk thunk) {
+        LocalDateTime start = now();
+        thunk.apply();
+        return ChronoUnit.MILLIS.between(start, now());
     }
 }
