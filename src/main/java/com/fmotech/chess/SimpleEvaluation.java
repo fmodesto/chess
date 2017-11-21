@@ -1,12 +1,13 @@
 package com.fmotech.chess;
 
-import java.util.Arrays;
-import java.util.Random;
-
 import static com.fmotech.chess.BitOperations.lowestBitPosition;
 import static com.fmotech.chess.BitOperations.nextLowestBit;
 
 public class SimpleEvaluation {
+
+    public static void main(String[] args) {
+        System.out.println(evaluateBoardPosition(Board.INIT.move(FenFormatter.moveFromFen(Board.INIT, "e2e4"))));
+    }
 
     private static byte[] PAWN = new byte[] {
             0, 0, 0, 0, 0, 0, 0, 0,

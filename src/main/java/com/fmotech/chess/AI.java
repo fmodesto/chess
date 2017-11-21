@@ -2,7 +2,6 @@ package com.fmotech.chess;
 
 import java.util.Random;
 
-import static com.fmotech.chess.DebugUtils.timeExecuting;
 import static com.fmotech.chess.FenFormatter.moveToFen;
 import static com.fmotech.chess.SimpleEvaluation.evaluateBoardPosition;
 
@@ -13,28 +12,28 @@ public class AI {
     private static Random random = new Random();
 
     public static void main(String[] args) {
-        Board b = FenFormatter.fromFen("7r/3p1k2/2p2p2/1n3Kp1/8/8/7P/7R b - - 11 45");
-//        Board b = Board.INIT;
-        b = b.move(FenFormatter.moveFromFen(b, "h8h4")).nextTurn();
-        b = b.move(FenFormatter.moveFromFen(b, "h1a1")).nextTurn();
-        c = 0;
-        final Board board = b;
-        System.out.println(timeExecuting(() -> negaMax(6, board, true)));
-        System.out.println(c);
-//        c = 0;
-//        System.out.println(timeExecuting(() -> minMax(6, board, true)));
-//        System.out.println(c);
-        c = 0;
-        System.out.println(timeExecuting(() -> negaMax(6, board, true, MIN_VALUE, MAX_VALUE)));
-        System.out.println(c);
-//        c = 0;
-//        System.out.println(timeExecuting(() -> minMax(6, board, true)));
-//        System.out.println(c);
+        Board b = Board.INIT;
+        for (int i = 0; i < 100; i++) {
+            b = move(b);
+        }
     }
+
+    private static Board move(Board board) {
+        System.out.println(board);
+        int move1 = (int) (negaMax(5, board, true, MIN_VALUE, MAX_VALUE) >>> 32);
+        int move2 = minMax(5, board, true);
+        System.out.println("---");
+        if (move1 == 0 || move1 != move2) {
+            System.err.println("ERROR");
+            System.exit(0);
+        }
+        return board.move(move1).nextTurn();
+    }
+
     static long c = 0;
 
     public static int bestMove(Board board) {
-        long result = negaMax(6, board, true, MIN_VALUE, MAX_VALUE);
+        long result = negaMax(5, board, true, MIN_VALUE, MAX_VALUE);
         return (int) (result >>> 32);
     }
 
@@ -57,7 +56,7 @@ public class AI {
             if (MoveGenerator.isValid(next)) {
                 int score = -(int) (negaMax(depth - 1, next.nextTurn(), false) & 0xFFFFFFFFL);
                 scores += " " + score;// + ":" + moveToFen(board, moves[i]);
-                if (score >= bestScore) {
+                if (score > bestScore) {
                     bestScore = score;
                     bestMove = moves[i];
                 }
@@ -78,9 +77,9 @@ public class AI {
 
         int[] moves = board.moves();
         int c = MoveGenerator.generateDirtyMoves(board, moves);
-        if (firstTime) {
-            shuffle(moves, c);
-        }
+//        if (firstTime) {
+//            shuffle(moves, c);
+//        }
 //        Arrays.sort(moves, 0, c);
 
         String scores = "";
@@ -89,7 +88,7 @@ public class AI {
             if (MoveGenerator.isValid(next)) {
                 int value = -((int) (negaMax(depth - 1, next.nextTurn(), false, -beta, -alpha) & 0xFFFFFFFFL));
                 scores += " " + value;// + ":" + moveToFen(board, moves[i]);
-                if (value >= bestValue) {
+                if (value > bestValue) {
                     bestValue = value;
                     bestMove = moves[i];
                 }
@@ -150,7 +149,7 @@ public class AI {
             if (MoveGenerator.isValid(next)) {
                 int score = (int) (min(depth - 1, next.nextTurn(), false) & 0xFFFFFFFFL);
                 sb.append(" ").append(score);
-                if (score >= bestScore) {
+                if (score > bestScore) {
                     bestScore = score;
                     bestMove = moves[i];
                 }
@@ -179,7 +178,7 @@ public class AI {
             if (MoveGenerator.isValid(next)) {
                 int score = (int) (max(depth - 1, next.nextTurn(), false) & 0xFFFFFFFFL);
                 sb.append(" ").append(score);
-                if (score <= bestScore) {
+                if (score < bestScore) {
                     bestScore = score;
                     bestMove = moves[i];
                 }

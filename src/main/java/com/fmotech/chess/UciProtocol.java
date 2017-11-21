@@ -89,7 +89,7 @@ public class UciProtocol {
     }
 
     public static void go(String parameter) {
-        send("bestmove " + FenFormatter.moveToFen(board, AI.bestMove(board)));
+        send("bestmove " + FenFormatter.moveToFen(board, AIDebug.bestMove(board, 5)));
     }
 
     public static void quit(String parameter) {

@@ -271,6 +271,6 @@ public class Board {
 
     @Override
     public String toString() {
-        return FenFormatter.toFen(this) + " " + leftPad(Long.toHexString(b4), 8, '0');
+        return FenFormatter.toFen(this);
     }
 }
