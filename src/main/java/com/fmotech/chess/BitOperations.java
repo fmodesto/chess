@@ -33,4 +33,16 @@ public class BitOperations {
     public static long reverse(long n) {
         return Long.reverse(n);
     }
+
+    public static long joinInts(int x, int y) {
+        return ((long) x << 32) | (y & 0xffffffffL);
+    }
+
+    public static int highInt(long l) {
+        return  (int) (l >> 32);
+    }
+
+    public static int lowInt(long l) {
+        return  (int) l;
+    }
 }

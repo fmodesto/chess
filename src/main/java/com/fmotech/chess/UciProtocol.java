@@ -16,11 +16,13 @@ import java.util.stream.Collectors;
 
 import static com.fmotech.chess.FenFormatter.fromFen;
 import static com.fmotech.chess.FenFormatter.moveFromFen;
+import static com.fmotech.chess.FenFormatter.moveToFen;
 import static org.apache.commons.lang3.StringUtils.defaultString;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 import static org.apache.commons.lang3.StringUtils.split;
 import static org.apache.commons.lang3.StringUtils.substringAfter;
 import static org.apache.commons.lang3.StringUtils.substringBefore;
+import static org.apache.commons.lang3.StringUtils.trim;
 
 @SuppressWarnings("unused")
 public class UciProtocol {
@@ -89,7 +91,12 @@ public class UciProtocol {
     }
 
     public static void go(String parameter) {
-        send("bestmove " + FenFormatter.moveToFen(board, AIDebug.bestMove(board, 5)));
+        if (parameter.startsWith("movetime ")) {
+            int time = Integer.parseInt(trim(substringAfter(parameter, "movetime")));
+            send("bestmove " + moveToFen(board, new AI(time).think(board)));
+        } else {
+            send("bestmove " + moveToFen(board, new AI(2000).think(board)));
+        }
     }
 
     public static void quit(String parameter) {

@@ -18,7 +18,7 @@ import static org.junit.Assert.fail;
 
 public class MoveGeneratorTest {
 
-    private static final int SKIP = 2;
+    private static final int SKIP = 0;
 
     @Test
     public void perftTests() {

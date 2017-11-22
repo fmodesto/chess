@@ -221,7 +221,7 @@ public class Board {
     // Enemy pieces
 
     public long enemyPieces() {
-        return ~b4 & pieces();
+        return b4 & pieces();
     }
 
     public long enemyPawns() {
