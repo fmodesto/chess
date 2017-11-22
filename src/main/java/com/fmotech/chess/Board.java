@@ -16,12 +16,13 @@ public class Board {
     private static final long LOW_ROCK = 1L;
     private static final long HIGH_ROCK = 1L << 7;
 
-    public static final int PAWN = 0b001;
-    public static final int ROCK = 0b110;
-    public static final int KNIGHT = 0b010;
+    public static final int KING = 0b100;
+    public static final int QUEEN = 0b110;
+    public static final int ROCK = 0b101;
     public static final int BISHOP = 0b011;
-    public static final int QUEEN = 0b100;
-    public static final int KING = 0b101;
+    public static final int KNIGHT = 0b010;
+    public static final int PAWN = 0b001;
+
     public static final int SPECIAL = 0b111;
 
     public static final int MOVE_CAST_H = 0x80;
@@ -33,8 +34,8 @@ public class Board {
     public static final Board INIT = Board.of(
             0xffff000000000000L,
             0x9900000000000099L,
-            0xe7000000000000e7L,
-            0x2cff00000000ff2cL | CASTLE);
+            0x7600000000000076L | CASTLE,
+            0xa5ff00000000ffa5L);
 
     private Board next;
     private int[] moves = new int[256];
@@ -49,9 +50,9 @@ public class Board {
 
     public static Board of(long color, long pawns, long rocks, long knights, long bishops, long queens, long kings, long enPassant, long castle) {
         return Board.of(color,
-                rocks | queens | kings | enPassant | castle,
-                rocks | knights | bishops | enPassant | castle,
-                pawns | bishops | kings | enPassant | castle);
+                queens | kings | rocks | enPassant | castle,
+                queens | knights | bishops | enPassant | castle,
+                pawns | bishops | rocks | enPassant | castle);
     }
 
     private Board set(long b4, long b3, long b2, long b1) {
@@ -104,39 +105,37 @@ public class Board {
             b2 |= newEnPassant | p2;
             b1 |= newEnPassant | p1;
             return nextBoard().set(b4, b3, b2, b1);
-        } else if ((src & b3 & b1 & RANK_1) != 0) {
-            if (src == ownKing()) {
-                long castle = 0;
-                long castleClear = 0;
-                if (src >>> 2 == dest) {
-                    castleClear = 1L;
-                    castle = src >>> 1;
-                } else if (src << 2 == dest) {
-                    castleClear = 1L << 7;
-                    castle = src << 1;
-                }
-                long clear = ~(src | dest | castle | enPassant() | castleClear);
-                long b4 = this.b4 & clear;
-                long b3 = this.b3 & clear;
-                long b2 = this.b2 & clear;
-                long b1 = this.b1 & clear & ~(castle() & RANK_1);
-                b4 |= whiteTurn() ? 0 : src | (enPassant() & ~dest) | castleClear;
-                b3 |= dest | castle;
-                b2 |= castle;
-                b1 |= dest;
-                return nextBoard().set(b4, b3, b2, b1);
-            } else /* Rocks */ {
-                long clear = ~(src | dest | enPassant());
-                long b4 = this.b4 & clear;
-                long b3 = this.b3 & clear;
-                long b2 = this.b2 & clear;
-                long b1 = this.b1 & clear;
-                b4 |= whiteTurn() ? 0 : src | (enPassant() & ~dest);
-                b3 |= dest;
-                b2 |= dest;
-                b1 |= 0;
-                return nextBoard().set(b4, b3, b2, b1);
+        } else if ((src & ownKing() & RANK_1) != 0) {
+            long castle = 0;
+            long castleClear = 0;
+            if (src >>> 2 == dest) {
+                castleClear = 1L;
+                castle = src >>> 1;
+            } else if (src << 2 == dest) {
+                castleClear = 1L << 7;
+                castle = src << 1;
             }
+            long clear = ~(src | dest | castle | enPassant() | castleClear);
+            long b4 = this.b4 & clear;
+            long b3 = this.b3 & clear;
+            long b2 = this.b2 & clear & ~(castle() & RANK_1);
+            long b1 = this.b1 & clear;
+            b4 |= whiteTurn() ? 0 : src | (enPassant() & ~dest) | castleClear;
+            b3 |= dest | castle;
+            b2 |= 0;
+            b1 |= castle;
+            return nextBoard().set(b4, b3, b2, b1);
+        } else if ((src & ownRocks() & RANK_1) != 0) {
+            long clear = ~(src | dest | enPassant());
+            long b4 = this.b4 & clear;
+            long b3 = this.b3 & clear;
+            long b2 = this.b2 & clear;
+            long b1 = this.b1 & clear;
+            b4 |= whiteTurn() ? 0 : src | (enPassant() & ~dest);
+            b3 |= dest;
+            b2 |= 0;
+            b1 |= dest;
+            return nextBoard().set(b4, b3, b2, b1);
         } else {
             long clear = ~(src | dest | enPassant());
             long b4 = this.b4 & clear;
@@ -199,7 +198,7 @@ public class Board {
     }
 
     public long ownRocks() {
-        return ~b4 & b3 & b2 & (~b1 | CASTLE);
+        return ~b4 & b3 & (~b2 | CASTLE) & b1;
     }
 
     public long ownKnights() {
@@ -211,11 +210,11 @@ public class Board {
     }
 
     public long ownQueens() {
-        return ~b4 & b3 & ~b2 & ~b1;
+        return ~b4 & b3 & b2 & ~b1;
     }
 
     public long ownKing() {
-        return ~b4 & b3 & ~b2 & b1;
+        return ~b4 & b3 & ~b2 & ~b1;
     }
 
     // Enemy pieces
@@ -229,7 +228,7 @@ public class Board {
     }
 
     public long enemyRocks() {
-        return b4 & b3 & b2 & (~b1 | CASTLE);
+        return b4 & b3 & (~b2 | CASTLE) & b1;
     }
 
     public long enemyKnights() {
@@ -241,11 +240,11 @@ public class Board {
     }
 
     public long enemyQueens() {
-        return b4 & b3 & ~b2 & ~b1;
+        return b4 & b3 & b2 & ~b1;
     }
 
     public long enemyKing() {
-        return b4 & b3 & ~b2 & b1;
+        return b4 & b3 & ~b2 & ~b1;
     }
 
     @Override

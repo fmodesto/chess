@@ -6,7 +6,9 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
 import static java.time.LocalDateTime.now;
+import static org.apache.commons.lang3.StringUtils.leftPad;
 
+@SuppressWarnings("unused")
 public class DebugUtils {
 
     public static final String CHESS = "♙♖♘♗♕♔♟♜♞♝♛♚";
@@ -109,7 +111,15 @@ public class DebugUtils {
         return StringUtils.replaceChars(sb.toString(), FEN, symbols);
     }
 
-    public static interface Thunk { void apply(); }
+    public static String toHexString(long l) {
+        return leftPad(Long.toHexString(l), 16, '0');
+    }
+
+    public static String toHexString(int i) {
+        return leftPad(Integer.toHexString(i), 8, '0');
+    }
+
+    public interface Thunk { void apply(); }
     public static long timeExecuting(Thunk thunk) {
         LocalDateTime start = now();
         thunk.apply();

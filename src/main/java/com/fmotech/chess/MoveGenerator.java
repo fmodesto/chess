@@ -23,7 +23,6 @@ import static com.fmotech.chess.MoveTables.BISHOP_LOW_TABLE;
 import static com.fmotech.chess.MoveTables.KING_TABLE;
 import static com.fmotech.chess.MoveTables.KNIGHT_TABLE;
 import static com.fmotech.chess.MoveTables.PAWN_ATTACK_TABLE;
-import static com.fmotech.chess.MoveTables.PAWN_TABLE;
 import static com.fmotech.chess.MoveTables.ROCK_HIGH_TABLE;
 import static com.fmotech.chess.MoveTables.ROCK_LOW_TABLE;
 
@@ -32,6 +31,7 @@ public class MoveGenerator {
     private static final long PAWN_RANK = 0x000000000000ff00L;
     private static final long RANK_7 = 0x00FF0000_00000000L;
     private static final long NONE = -1L;
+    private static final int KING_MASK = 0x8 | KING;
 
     public static long countMoves(int level, Board board) {
         if (level == 0) return 1;
@@ -88,7 +88,7 @@ public class MoveGenerator {
     }
 
     private static int generateKingAttackMoves(Board board, int counter, int[] moves) {
-        return generateTargetMoves(board, board.ownKing(), board.enemyPieces(), KING_TABLE, KING, counter, moves);
+        return generateTargetMoves(board, board.ownKing(), board.enemyPieces(), KING_TABLE, KING_MASK, counter, moves);
     }
 
     private static int generateKnightAttackMoves(Board board, int counter, int[] moves) {
@@ -184,14 +184,14 @@ public class MoveGenerator {
     private static int generateKingMoves(Board board, int counter, int[] moves) {
         long king = board.ownKing();
         int kingPos = lowestBitPosition(king);
-        counter = generateTargetMoves(board, king, ~board.ownPieces(), KING_TABLE, KING, counter, moves);
+        counter = generateTargetMoves(board, king, ~board.ownPieces(), KING_TABLE, KING_MASK, counter, moves);
         if (board.castleLow() && !isPositionInAttack(board, kingPos) && !isPositionInAttack(board, kingPos - 1)
                 && !isPositionInAttack(board, kingPos - 2)) {
-            moves[counter++] = createMove(kingPos, kingPos - 2, KING, 0, MOVE_CAST_L);
+            moves[counter++] = createMove(kingPos, kingPos - 2, KING_MASK, 0, MOVE_CAST_L);
         }
         if (board.castleHigh() && !isPositionInAttack(board, kingPos) && !isPositionInAttack(board, kingPos + 1)
                 && !isPositionInAttack(board, kingPos + 2)) {
-            moves[counter++] = createMove(kingPos, kingPos + 2, KING, 0, MOVE_CAST_H);
+            moves[counter++] = createMove(kingPos, kingPos + 2, KING_MASK, 0, MOVE_CAST_H);
         }
         return counter;
     }
@@ -261,7 +261,7 @@ public class MoveGenerator {
     }
 
     private static int createMove(int srcPos, int tgtPos, int srcType, int tgtType, int flags) {
-        return flags << 24 | tgtType << 20 | srcType << 16 | tgtPos << 8 | srcPos;
+        return flags << 24 | tgtType << 20 | (~srcType & 0xF) << 16 | tgtPos << 8 | srcPos;
     }
 
     public static boolean isPositionInAttack(Board board, int pos) {
