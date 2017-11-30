@@ -50,7 +50,7 @@ public class DebugUtils {
             s += 1;
         }
         if ((enPassant & 0x0000_FF00_0000_0000L) != 0) color |= enPassant;
-        Board board = Board.of(color, pawns, rocks, knights, bishops, queens, kings, enPassant, castle);
+        Board board = Board.of(0, 0, color, pawns, rocks, knights, bishops, queens, kings, enPassant, castle);
         return whiteTurn ? board : board.nextTurn();
     }
 
@@ -67,7 +67,7 @@ public class DebugUtils {
     }
 
     public static void debug(String symbols, int type, long board) {
-        debug(symbols, Board.of(0, test(type, 0b100) ? board : 0, test(type, 0b010) ? board : 0, test(type, 0b001) ? board : 0));
+        debug(symbols, Board.of(0, 0, test(type, 0b100) ? board : 0, test(type, 0b010) ? board : 0, test(type, 0b001) ? board : 0));
     }
 
     private static boolean test(int type, int mask) {

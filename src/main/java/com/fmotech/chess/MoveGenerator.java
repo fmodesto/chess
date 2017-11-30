@@ -38,6 +38,7 @@ public class MoveGenerator {
         long scenarios = 0;
         int[] moves = board.moves();
         int counter = generateDirtyMoves(board, moves);
+//        board.hash();
         for (int i = 0; i < counter; i++) {
             Board nextBoard = board.move(moves[i]);
             int kingPosition = lowestBitPosition(nextBoard.ownKing());
@@ -63,6 +64,10 @@ public class MoveGenerator {
     public static boolean isValid(Board board) {
         int kingPosition = lowestBitPosition(board.ownKing());
         return !isPositionInAttack(board, kingPosition);
+    }
+
+    public static boolean isChecked(Board board) {
+        return !isValid(board);
     }
 
     public static int generateDirtyMoves(Board board, int[] moves) {

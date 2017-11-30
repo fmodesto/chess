@@ -1,10 +1,13 @@
 package com.fmotech.chess;
 
 import java.util.Arrays;
+import java.util.Random;
 
+import static com.fmotech.chess.BitOperations.highInt;
+import static com.fmotech.chess.BitOperations.lowInt;
+import static com.fmotech.chess.BitOperations.lowestBitPosition;
+import static com.fmotech.chess.BitOperations.nextLowestBit;
 import static com.fmotech.chess.BitOperations.reverse;
-import static org.apache.commons.lang3.StringUtils.leftPad;
-import static org.apache.commons.lang3.StringUtils.substring;
 
 public class Board {
     private static final long CASTLE = 0x8100000000000081L;
@@ -31,7 +34,10 @@ public class Board {
     public static final int MOVE_EP = 0x10;
     public static final int MOVE_PROMO = 0x08;
 
-    public static final Board INIT = Board.of(
+    private static final long HASH1_BITS = 0xDEADBEEFDEADBEEFL;
+    private static final long HASH2_BITS = 0x9E3779B97F4A7C13L;
+
+    public static final Board INIT = Board.of(0,
             0xffff000000000000L,
             0x9900000000000099L,
             0x7600000000000076L | CASTLE,
@@ -39,23 +45,33 @@ public class Board {
 
     private Board next;
     private int[] moves = new int[256];
+    private long ply;
     private long b4;
     private long b3;
     private long b2;
     private long b1;
 
-    public static Board of(long b4, long b3, long b2, long b1) {
-        return new Board().set(b4, b3, b2, b1);
+    public static Board of(long ply, long b4, long b3, long b2, long b1) {
+        return new Board().set(ply, b4, b3, b2, b1);
     }
 
-    public static Board of(long color, long pawns, long rocks, long knights, long bishops, long queens, long kings, long enPassant, long castle) {
-        return Board.of(color,
+    public static Board of(int ply, int fifty, long color, long pawns, long rocks, long knights, long bishops, long queens, long kings, long enPassant, long castle) {
+        return Board.of(BitOperations.joinInts(fifty, ply), color,
                 queens | kings | rocks | enPassant | castle,
                 queens | knights | bishops | enPassant | castle,
                 pawns | bishops | rocks | enPassant | castle);
     }
 
-    private Board set(long b4, long b3, long b2, long b1) {
+    public static Board fen(String fen) {
+        return FenFormatter.fromFen(fen);
+    }
+
+    public Board cloneBoard() {
+        return Board.of(ply, b4, b3, b2, b1);
+    }
+
+    private Board set(long ply, long b4, long b3, long b2, long b1) {
+        this.ply = ply;
         this.b4 = b4;
         this.b3 = b3;
         this.b2 = b2;
@@ -71,7 +87,19 @@ public class Board {
     }
 
     public Board nextTurn() {
-        return nextBoard().set(reverse(~b4), reverse(b3), reverse(b2), reverse(b1));
+        return nextBoard().set(ply + 1, reverse(~b4), reverse(b3), reverse(b2), reverse(b1));
+    }
+
+    public int ply() {
+        return lowInt(ply);
+    }
+
+    public int fullMove() {
+        return (lowInt(ply) / 2) + 1;
+    }
+
+    public int fifty() {
+        return lowInt(ply) - highInt(ply);
     }
 
     public int[] moves() {
@@ -87,6 +115,7 @@ public class Board {
     }
 
     public Board move(long src, long dest, int promotion) {
+        long currentPly = ply();
         if ((src & ownPawns()) != 0) {
             long oldEnPassant = enPassant();
             long newEnPassant = (src << 8) & (dest >>> 8);
@@ -104,7 +133,7 @@ public class Board {
             b3 |= newEnPassant | p3;
             b2 |= newEnPassant | p2;
             b1 |= newEnPassant | p1;
-            return nextBoard().set(b4, b3, b2, b1);
+            return nextBoard().set((currentPly + 1) << 32 | currentPly, b4, b3, b2, b1);
         } else if ((src & ownKing() & RANK_1) != 0) {
             long castle = 0;
             long castleClear = 0;
@@ -124,7 +153,8 @@ public class Board {
             b3 |= dest | castle;
             b2 |= 0;
             b1 |= castle;
-            return nextBoard().set(b4, b3, b2, b1);
+            long ply = (dest & enemyPieces()) == 0 ? this.ply : (currentPly + 1) << 32 | currentPly;
+            return nextBoard().set(ply, b4, b3, b2, b1);
         } else if ((src & ownRocks() & RANK_1) != 0) {
             long clear = ~(src | dest | enPassant());
             long b4 = this.b4 & clear;
@@ -135,7 +165,8 @@ public class Board {
             b3 |= dest;
             b2 |= 0;
             b1 |= dest;
-            return nextBoard().set(b4, b3, b2, b1);
+            long ply = (dest & enemyPieces()) == 0 ? this.ply : (currentPly + 1) << 32 | currentPly;
+            return nextBoard().set(ply, b4, b3, b2, b1);
         } else {
             long clear = ~(src | dest | enPassant());
             long b4 = this.b4 & clear;
@@ -146,7 +177,8 @@ public class Board {
             b3 |= ((this.b3 & src) != 0) ? dest : 0;
             b2 |= ((this.b2 & src) != 0) ? dest : 0;
             b1 |= ((this.b1 & src) != 0) ? dest : 0;
-            return nextBoard().set(b4, b3, b2, b1);
+            long ply = (dest & enemyPieces()) == 0 ? this.ply : (currentPly + 1) << 32 | currentPly;
+            return nextBoard().set(ply, b4, b3, b2, b1);
         }
     }
 
@@ -261,15 +293,56 @@ public class Board {
 
     @Override
     public int hashCode() {
-        int result = (int) (b4 ^ (b4 >>> 32));
-        result = 31 * result + (int) (b3 ^ (b3 >>> 32));
-        result = 31 * result + (int) (b2 ^ (b2 >>> 32));
-        result = 31 * result + (int) (b1 ^ (b1 >>> 32));
-        return result;
+        long hash = hash();
+        return (int) (hash ^ (hash >>> 32));
     }
 
     @Override
     public String toString() {
-        return FenFormatter.toFen(this);
+        return DebugUtils.toHexString(hash()) + " " + FenFormatter.toFen(this);
+    }
+
+    public long hash() {
+        long h0, h1, h2, h3;
+        h0 = HASH2_BITS;
+        h1 = HASH2_BITS;
+        h2 = HASH1_BITS;
+        h3 = HASH1_BITS;
+
+        h2 += b4;
+        h3 += b3;
+
+        h2 = (h2 << 50) | (h2 >>> 14);  h2 += h3;  h0 ^= h2;
+        h3 = (h3 << 52) | (h3 >>> 12);  h3 += h0;  h1 ^= h3;
+        h0 = (h0 << 30) | (h0 >>> 34);  h0 += h1;  h2 ^= h0;
+        h1 = (h1 << 41) | (h1 >>> 23);  h1 += h2;  h3 ^= h1;
+        h2 = (h2 << 54) | (h2 >>> 10);  h2 += h3;  h0 ^= h2;
+        h3 = (h3 << 48) | (h3 >>> 16);  h3 += h0;  h1 ^= h3;
+        h0 = (h0 << 38) | (h0 >>> 26);  h0 += h1;  h2 ^= h0;
+        h1 = (h1 << 37) | (h1 >>> 27);  h1 += h2;  h3 ^= h1;
+        h2 = (h2 << 62) | (h2 >>> 2);   h2 += h3;  h0 ^= h2;
+        h3 = (h3 << 34) | (h3 >>> 30);  h3 += h0;  h1 ^= h3;
+        h0 = (h0 << 5)  | (h0 >>> 59);  h0 += h1;  h2 ^= h0;
+        h1 = (h1 << 36) | (h1 >>> 28);  h1 += h2;  h3 ^= h1;
+
+        h0 += b2;
+        h1 += b1;
+
+        h2 += HASH1_BITS;
+        h3 += HASH1_BITS;
+
+        h3 ^= h2;  h2 = (h2 << 15) | (h2 >>> 49);  h3 += h2;
+        h0 ^= h3;  h3 = (h3 << 52) | (h3 >>> 12);  h0 += h3;
+        h1 ^= h0;  h0 = (h0 << 26) | (h0 >>> 38);  h1 += h0;
+        h2 ^= h1;  h1 = (h1 << 51) | (h1 >>> 13);  h2 += h1;
+        h3 ^= h2;  h2 = (h2 << 28) | (h2 >>> 36);  h3 += h2;
+        h0 ^= h3;  h3 = (h3 << 9)  | (h3 >>> 55);  h0 += h3;
+        h1 ^= h0;  h0 = (h0 << 47) | (h0 >>> 17);  h1 += h0;
+        h2 ^= h1;  h1 = (h1 << 54) | (h1 >>> 10);  h2 += h1;
+        h3 ^= h2;  h2 = (h2 << 32) | (h2 >>> 32);  h3 += h2;
+        h0 ^= h3;  h3 = (h3 << 25) | (h3 >>> 39);  h0 += h3;
+        h1 ^= h0;  h0 = (h0 << 63) | (h0 >>> 1);   h1 += h0;
+
+        return h0;
     }
 }

@@ -1,21 +1,29 @@
 package com.fmotech.chess;
 
+import it.unimi.dsi.fastutil.longs.Long2LongMap;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+
 import static com.fmotech.chess.BitOperations.highInt;
-import static com.fmotech.chess.BitOperations.joinInts;
 import static com.fmotech.chess.BitOperations.lowInt;
 import static com.fmotech.chess.FenFormatter.moveToFen;
 import static com.fmotech.chess.SimpleEvaluation.evaluateBoardPosition;
+import static java.lang.Float.max;
+import static java.lang.Math.abs;
 
 public class AI {
 
     private static final int MAX_DEPTH = 16;
-    private static final int MIN_VALUE = -1000000;
-    private static final int MAX_VALUE = 1000000;
-    private final long timeout;
+    private static final int MIN_VALUE = -32000;
+    private static final int MAX_VALUE = 32000;
 
-    private long[][] pv = new long[MAX_DEPTH][MAX_DEPTH];
-    private int[] pvLength = new int[MAX_DEPTH];
+    private final long timeout;
     private int nodes;
+    private Long2LongOpenHashMap table = new Long2LongOpenHashMap();
+
+    private int failHigh = 0;
+    private int failHighFirst = 0;
+    private int failFoundPvCount = 0;
+    private int foundPvCount = 0;
 
     public AI(int millis) {
         this.timeout = System.currentTimeMillis() + millis;
@@ -24,7 +32,7 @@ public class AI {
     public static class Timeout extends RuntimeException {}
 
     public static void main(String[] args) {
-        Board board = FenFormatter.fromFen("8/1kp5/p1p1R3/6P1/1p1r4/7P/6K1/8 w - - 0 39");
+        Board board = Board.INIT;
         for (int i = 0; i < 100; i++) {
             board = move(board);
         }
@@ -32,99 +40,135 @@ public class AI {
     }
 
     private static Board move(Board board) {
-        AI ai = new AI(20000);
+        AI ai = new AI(10_000);
         int move = ai.think(board);
         return board.move(move).nextTurn();
     }
 
     public int think(Board board) {
         int move = 0;
+        int depth = 1;
         try {
-            for (int i = 1; i < MAX_DEPTH; i++) {
-                negaMax(0, i, board, MIN_VALUE, MAX_VALUE);
-                move = lowInt(pv[0][0]);
-                explainMove(board);
+            while (depth < MAX_DEPTH) {
+                long time = System.currentTimeMillis();
+                int score = negaMax(board.ply() + depth, board, MIN_VALUE, MAX_VALUE);
+                time = System.currentTimeMillis() - time;
+                long data = table.get(board.hash());
+                move = lowInt(data);
+                explainMove(board, score, depth, time);
+                if (MAX_VALUE - abs(highInt(data)) <= 512) {
+                    break;
+                }
+                depth++;
             }
         } catch (Timeout e) {
-            System.out.println(nodes);
+            depth--;
         }
+        System.out.println(depth + " " + nodes + " " + foundPvCount);
         return move;
     }
 
-    private void explainMove(Board board) {
-        for (int i = 0; i < pvLength[0]; i++) {
-            long play = pv[0][i];
-            System.out.print(moveToFen(board, lowInt(play)) + " " + highInt(play) + " ");
+    private void explainMove(Board board, int score, int depth, long time) {
+        System.out.print(board.ply() + " ");
+        for (int i = 0; i < depth; i++) {
+            long play = table.get(board.hash());
+            if (i == 0)
+                System.out.print((board.whiteTurn() ? score : -score) + " ");
+            System.out.print(moveToFen(board, lowInt(play)));
             board = board.move(lowInt(play)).nextTurn();
+            System.out.print(" {" + eval(board) + "} ");
         }
-        System.out.println();
+        System.out.println("in " + nodes + " nodes, cutting: " + failHighFirst / max(1F, failHigh)
+                + ", pvs: " + (1 - (failFoundPvCount / max(1F, foundPvCount)))
+                + ", table size: " + table.size() + " time: " + time + "ms");
     }
 
-    private int negaMax(int ply, int depth, Board board, int alpha, int beta) {
-        if (ply == depth) return quiescentNegaMax(ply, board, alpha, beta);
+    private int eval(Board board) {
+        return board.whiteTurn() ? evaluateBoardPosition(board) : -evaluateBoardPosition(board);
+    }
+
+    private int negaMax(int depth, Board board, int alpha, int beta) {
+        if (board.ply() == depth) return evaluateBoardPosition(board);
+
+        long data = table.addTo(board.hash(), 0x100000000L);
 
         nodes += 1;
         if ((nodes & 1023) == 0)
             checkTime();
 
-        pvLength[ply] = ply;
+        boolean check = MoveGenerator.isChecked(board);
+        if (check) depth++;
+
         int[] moves = board.moves();
         int c = MoveGenerator.generateDirtyMoves(board, moves);
+        int validMoves = 0;
+        boolean followPv = sortMoves(c, moves, lowInt(data));
+        boolean foundPv = false;
 
         for (int i = 0; i < c; i++) {
+            if (!followPv)
+                sortMoves(i, c, moves);
+            followPv = false;
+
             Board next = board.move(moves[i]);
             if (!MoveGenerator.isValid(next))
                 continue;
 
-            int value = -negaMax(ply + 1, depth, next.nextTurn(), -beta, -alpha);
-            if (value > alpha) {
-                if (value >= beta)
-                    return beta;
-                alpha = value;
-                updatePv(ply, moves, i, value);
-            }
-        }
-        return alpha;
-    }
-
-    private int quiescentNegaMax(int ply, Board board, int alpha, int beta) {
-        if (ply > MAX_DEPTH - 2) return evaluateBoardPosition(board);
-
-        nodes += 1;
-        if ((nodes & 1023) == 0)
-            checkTime();
-
-        int value = evaluateBoardPosition(board);
-        if (value >= beta)
-            return beta;
-        if (value > alpha)
-            alpha = value;
-
-        pvLength[ply] = ply;
-        int[] moves = board.moves();
-        int c = MoveGenerator.generateDirtyAttackMoves(board, moves);
-
-        for (int i = 0; i < c; i++) {
-            Board next = board.move(moves[i]);
-            if (MoveGenerator.isValid(next)) {
-                value = -quiescentNegaMax(ply + 1, next.nextTurn(), -beta, -alpha);
-                if (value > alpha) {
-                    if (value >= beta)
-                        return beta;
-                    alpha = value;
-                    updatePv(ply, moves, i, value);
+            validMoves += 1;
+            int value;
+            if (foundPv) {
+                foundPvCount++;
+                value = -negaMax(depth, next.nextTurn(), -alpha - 1, -alpha);
+                if ((value > alpha) && (value < beta)) {
+                    // Check for failure.
+                    value = -negaMax(depth, next.nextTurn(), -beta, -alpha);
+                    failFoundPvCount++;
                 }
+            } else {
+                value = -negaMax(depth, next.nextTurn(), -beta, -alpha);
             }
+            if (value >= beta) {
+                if (validMoves == 1) failHighFirst++;
+                failHigh++;
+                return beta;
+            }
+            if (value > alpha) {
+                alpha = value;
+                table.put(board.hash(), BitOperations.joinInts(alpha, moves[i]));
+                foundPv = true;
+            }
+        }
+
+        if (validMoves == 0) {
+            return check ? MIN_VALUE + board.ply() : 0;
         }
         return alpha;
     }
 
-    private void updatePv(int ply, int[] moves, int i, int value) {
-        pv[ply][ply] =  joinInts(value, moves[i]);
-        for (int j = ply + 1; j < pvLength[ply + 1]; j++) {
-            pv[ply][j] = pv[ply + 1][j];
+    private void sortMoves(int from, int to, int[] moves) {
+        int index = from;
+        int best = (moves[from] >>> 16) & 0xFF;
+        for (int i = from + 1; i < to; i++) {
+            if (((moves[i] >>> 16) & 0xFF) > best) {
+                best = (moves[i] >>> 16) & 0xFF;
+                index = i;
+            }
         }
-        pvLength[ply] = pvLength[ply + 1];
+
+        int t = moves[from];
+        moves[from] = moves[index];
+        moves[index] = t;
+    }
+
+    private boolean sortMoves(int size, int[] moves, int pv) {
+        if (pv == 0) return false;
+        for (int i = 0; i < size; i++) {
+            if (moves[i] == pv) {
+                moves[i] = moves[0];
+                moves[0] = pv;
+            }
+        }
+        return moves[0] == pv;
     }
 
     private void checkTime() {

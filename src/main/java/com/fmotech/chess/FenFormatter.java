@@ -46,11 +46,16 @@ public class FenFormatter {
             enPassant |= (1L << p) & (whiteTurn ? pawns << 8 : pawns >>> 8);
             if (whiteTurn) color |= enPassant;
         }
-        Board board = Board.of(color, pawns, rocks, knights, bishops, queens, kings, enPassant, castle);
+        int ply = 2 * (Integer.parseInt(parts[5]) - 1);
+        int fifty = ply - Integer.parseInt(parts[4]) + (whiteTurn ? 0 : 1);
+
+        Board board = Board.of(ply, fifty, color, pawns, rocks, knights, bishops, queens, kings, enPassant, castle);
         return whiteTurn ? board : board.nextTurn();
     }
 
     public static String toFen(Board board) {
+        String moves = " " + board.fifty() + " " + board.fullMove();
+
         boolean whiteTurn = board.whiteTurn();
         board = whiteTurn ? board : board.nextTurn();
 
@@ -95,8 +100,8 @@ public class FenFormatter {
         } else {
             sb.append("-");
         }
-        sb.append(" 0 1");
-        return sb.toString();
+
+        return sb.toString() + moves;
     }
 
     private static void fill(char[] board, long pieces, char character) {
