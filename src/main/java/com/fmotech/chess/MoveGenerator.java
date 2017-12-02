@@ -38,7 +38,6 @@ public class MoveGenerator {
         long scenarios = 0;
         int[] moves = board.moves();
         int counter = generateDirtyMoves(board, moves);
-//        board.hash();
         for (int i = 0; i < counter; i++) {
             Board nextBoard = board.move(moves[i]);
             int kingPosition = lowestBitPosition(nextBoard.ownKing());
@@ -81,7 +80,7 @@ public class MoveGenerator {
         return counter;
     }
 
-    public static int generateDirtyAttackMoves(Board board, int[] moves) {
+    public static int generateDirtyCaptureMoves(Board board, int[] moves) {
         int counter = 0;
         counter = generatePawnAttackMoves(board, counter, moves);
         counter = generateRocksMoves(board, board.enemyPieces(), counter, moves);

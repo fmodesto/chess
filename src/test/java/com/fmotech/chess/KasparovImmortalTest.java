@@ -112,11 +112,12 @@ public class KasparovImmortalTest {
         String[] moves = normalizeSpace(PGN.replaceAll("[0-9]*\\.", "")).split(" ");
         Game game = new Game();
         for (int i = 0; i < moves.length; i++) {
+            System.out.println(i + " " + moves[i]);
             assertEquals(FENS[i], toFen(game.currentBoard()));
             game.move(moves[i]);
         }
         assertEquals(FENS[moves.length], toFen(game.currentBoard()));
-        game.printPgn();
+        System.out.println(game.pgn());
     }
 
     @Test

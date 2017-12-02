@@ -1,5 +1,6 @@
 package com.fmotech.chess;
 
+import static com.fmotech.chess.BitOperations.reverse;
 import static org.apache.commons.lang3.StringUtils.remove;
 import static org.apache.commons.lang3.StringUtils.substring;
 
@@ -20,9 +21,9 @@ public class SanFormatter {
         int[] moves = board.moves();
         int counter = MoveGenerator.generateValidMoves(board, moves);
         int m;
-        if (whiteTurn && "O-O".equals(move) || !whiteTurn && "O-O-O".equals(move)) {
+        if ("O-O".equals(move)) {
             m = findMove(board.ownKing(), board.ownKing() >>> 2, counter, moves);
-        } else if (whiteTurn && "O-O-O".equals(move) || !whiteTurn && "O-O".equals(move)) {
+        } else if ("O-O-O".equals(move)) {
             m = findMove(board.ownKing(), board.ownKing() << 2, counter, moves);
         } else if (type == 'K') {
             m = findMove(src & board.ownKing(), tgt, counter, moves);
@@ -48,7 +49,7 @@ public class SanFormatter {
         if (move.length() == 0) {
             return -1;
         }
-        return whiteTurn ? createMask(move) : Long.reverse(createMask(move));
+        return whiteTurn ? createMask(move) : reverse(createMask(move));
     }
 
     private static long createMask(String move) {

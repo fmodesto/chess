@@ -15,13 +15,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.fmotech.chess.FenFormatter.fromFen;
-import static com.fmotech.chess.FenFormatter.moveFromFen;
-import static com.fmotech.chess.FenFormatter.moveToFen;
 import static org.apache.commons.lang3.StringUtils.defaultString;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 import static org.apache.commons.lang3.StringUtils.split;
 import static org.apache.commons.lang3.StringUtils.substringAfter;
 import static org.apache.commons.lang3.StringUtils.substringBefore;
+import static org.apache.commons.lang3.StringUtils.substringBetween;
 import static org.apache.commons.lang3.StringUtils.trim;
 
 @SuppressWarnings("unused")
@@ -31,7 +30,7 @@ public class UciProtocol {
 
     private static Map<String, Method> commands;
     private static PrintStream logs;
-    private static Board board;
+    private static Game game;
 
     public static void main(String[] args) {
         commands = Arrays.stream(UciProtocol.class.getMethods())
@@ -84,19 +83,34 @@ public class UciProtocol {
     public static void position(String parameter) {
         String initial = defaultString(substringBefore(parameter, "moves"), parameter);
         String moves = substringAfter(parameter, "moves");
-        board = initial.startsWith("fen") ? fromFen(substringAfter(initial, "fen")) : Board.INIT;
-        for (String move : split(moves, " ")) {
-            board = board.move(moveFromFen(board, move)).nextTurn();
+        game = new Game(initial.startsWith("fen") ? fromFen(substringAfter(initial, "fen")) : Board.INIT);
+        for (String fenMove : split(moves, " ")) {
+            game.move(fenMove);
         }
     }
 
     public static void go(String parameter) {
-        if (parameter.startsWith("movetime ")) {
-            int time = Integer.parseInt(trim(substringAfter(parameter, "movetime")));
-            send("bestmove " + moveToFen(board, new AI(time).think(board)));
-        } else {
-            send("bestmove " + moveToFen(board, new AI(2000).think(board)));
+        int depth = parse(parameter, "depth", 64);
+        int movesToGo = parse(parameter, "movestogo", 30);
+        int moveTime = parse(parameter, "movetime", 0);
+        int time = game.whiteTurn() ? parse(parameter, "wtime", 0) : parse(parameter, "btime", 0);
+        int inc = game.whiteTurn() ? parse(parameter, "winc", 0) : parse(parameter, "binc", 0);
+
+        if (moveTime > 0) {
+            time = moveTime;
+            movesToGo = 1;
         }
+
+        if (time > 0) {
+            time = Math.max(1, time / movesToGo - 50 + inc);
+        }
+        send("bestmove " + game.thinkMove(time, depth));
+    }
+
+    private static int parse(String parameter, String name, int defaultValue) {
+        if (!parameter.contains(name + " "))
+            return defaultValue;
+        return Integer.parseInt(trim(defaultString(substringBetween(parameter, name + " ", " "), substringAfter(parameter, name + " "))));
     }
 
     public static void quit(String parameter) {

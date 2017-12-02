@@ -31,7 +31,7 @@ public class BitOperations {
     }
 
     public static long reverse(long n) {
-        return Long.reverse(n);
+        return Long.reverseBytes(n);
     }
 
     public static long joinInts(int high, int low) {

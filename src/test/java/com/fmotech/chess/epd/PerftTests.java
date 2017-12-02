@@ -2,18 +2,17 @@ package com.fmotech.chess.epd;
 
 import com.fmotech.chess.Board;
 import com.fmotech.chess.MoveGenerator;
-import com.fmotech.chess.epd.EpdReader;
 import com.fmotech.chess.epd.EpdReader.Epd;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.fmotech.chess.MoveGenerator.countMoves;
 import static java.lang.Long.parseLong;
 import static java.time.LocalDateTime.now;
 import static java.time.temporal.ChronoUnit.MILLIS;
@@ -24,7 +23,7 @@ public class PerftTests {
 
     private final Epd epd;
 
-    @Parameterized.Parameters
+    @Parameters
     public static List<Object[]> data() throws Exception {
         return EpdReader.read(Paths.get("src/test/resources/perftsuite.epd"))
                 .map(e -> new Object[] { e })

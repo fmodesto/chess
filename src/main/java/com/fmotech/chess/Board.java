@@ -303,6 +303,10 @@ public class Board {
     }
 
     public long hash() {
+        // Spooky Hash 64
+        // Extracted from David Curtis: https://github.com/mayconbordin/streaminer/blob/master/src/main/java/org/streaminer/util/hash/SpookyHash64.java
+        // Licensed under the Apache License, Version 2.0 (the "License") http://www.apache.org/licenses/LICENSE-2.0
+
         long h0, h1, h2, h3;
         h0 = HASH2_BITS;
         h1 = HASH2_BITS;

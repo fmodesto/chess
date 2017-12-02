@@ -2,8 +2,6 @@ package com.fmotech.chess;
 
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 
-import static com.fmotech.chess.BitOperations.highInt;
-import static com.fmotech.chess.BitOperations.lowInt;
 import static com.fmotech.chess.FenFormatter.moveToFen;
 import static com.fmotech.chess.PvData.BETA;
 import static com.fmotech.chess.PvData.CLOSE;
@@ -15,15 +13,16 @@ import static com.fmotech.chess.PvData.score;
 import static com.fmotech.chess.PvData.status;
 import static com.fmotech.chess.SimpleEvaluation.evaluateBoardPosition;
 import static java.lang.Float.max;
+import static java.lang.Integer.signum;
 import static java.lang.Math.abs;
 
 public class AI {
 
-    private static final int MAX_DEPTH = 16;
     private static final int MIN_VALUE = -32000;
     private static final int MAX_VALUE = 32000;
 
     private final long timeout;
+    private final int maxDepth;
     private int nodes;
     private int initialPly;
     private Long2LongOpenHashMap table = new Long2LongOpenHashMap();
@@ -32,66 +31,61 @@ public class AI {
     private int failHighFirst = 0;
     private int failFoundPvCount = 0;
     private int foundPvCount = 0;
+    private final Board board;
 
-    public AI(int millis) {
-        this.timeout = System.currentTimeMillis() + millis;
+    public AI(int millis, int maxDepth, Board board, long[] hashes) {
+        this.timeout = System.currentTimeMillis() + (millis <= 0 ? Integer.MAX_VALUE : millis);
+        this.maxDepth = maxDepth;
+        this.board = board;
+        for (int i = board.ply() - 2; i >= board.ply() - board.fifty(); i--) {
+            table.put(hashes[i], OPEN);
+        }
     }
 
     public static class Timeout extends RuntimeException {}
 
-    public static void main(String[] args) {
-        Board board = Board.INIT;
-        while (board.ownKing() != 0) {
-            board = doMove(board);
-        }
-        System.out.println(board);
-    }
-
-    private static Board doMove(Board board) {
-        AI ai = new AI(10_000);
-        int move = ai.think(board);
-        return board.move(move).nextTurn();
-    }
-
-    public int think(Board board) {
+    public int think() {
         int move = 0;
         int depth = 1;
         try {
             initialPly = board.ply();
-            while (depth < MAX_DEPTH) {
+            while (depth <= maxDepth) {
                 long time = System.currentTimeMillis();
                 int score = negaMax(board.ply() + depth, board, MIN_VALUE, MAX_VALUE);
                 time = System.currentTimeMillis() - time;
                 long data = table.get(board.hash());
                 move = move(data);
                 explainMove(board, score, depth, time);
+                depth++;
                 if (MAX_VALUE - abs(score(data)) <= 512) {
                     break;
-                } else if (timeout - System.currentTimeMillis() < 7000) {
-                    break;
                 }
-                depth++;
             }
         } catch (Timeout e) {
-            depth--;
         }
+        depth--;
         System.out.println(depth + " " + nodes + " " + foundPvCount);
         return move;
     }
 
     private void explainMove(Board board, int score, int depth, long time) {
-        System.out.print(board.ply() + " ");
+        String sc = "cp " + score;
+        if (MAX_VALUE - abs(score) <= 512) {
+            int sign = signum(score);
+            sc = "mate " + sign * (MAX_VALUE - abs(score) - board.ply());
+        }
+        System.out.printf("info score %s depth %d nodes %d time %d pv ", sc, depth, nodes, time);
+
         for (int i = 0; i < depth; i++) {
             long play = table.get(board.hash());
-            if (i == 0)
-                System.out.print((board.whiteTurn() ? score : -score) + " ");
-            System.out.print(moveToFen(board, move(play)));
-            board = board.move(move(play)).nextTurn();
-            System.out.print(" {" + eval(board) + "} ");
+            int move = move(play);
+            if (move == 0) break;
+            System.out.print(moveToFen(board, move) + " ");
+            board = board.move(move).nextTurn();
         }
-        System.out.println("in " + nodes + " nodes, cutting: " + failHighFirst / max(1F, failHigh)
-                + ", pvs: " + (1 - (failFoundPvCount / max(1F, foundPvCount)))
-                + ", table size: " + table.size() + " time: " + time + "ms");
+        System.out.println("\t_ordering " + failHighFirst / max(1F, failHigh)
+                + " _pvs " + (1 - (failFoundPvCount / max(1F, foundPvCount)))
+                + " _table " + table.size());
     }
 
     private int eval(Board board) {
@@ -102,16 +96,17 @@ public class AI {
         long hash = board.hash();
         long data = table.get(hash);
 
+        long status = status(data);
+        if ((status == OPEN || board.fifty() >= 100) && board.ply() != initialPly)
+            return 0;
+
         if (board.ply() == depth) {
-            alpha = evaluateBoardPosition(board);
+            alpha = quiescentSearch(board, alpha, beta);
             table.put(hash, create(CLOSE | EXACT, board.ply(), 0, alpha, move(table.get(hash))));
             return alpha;
         }
-        maintenance();
 
-        long status = status(data);
-        if (status == OPEN && board.ply() != initialPly)
-            return 0;
+        maintenance();
 
         table.put(hash, data | OPEN);
 
@@ -164,9 +159,48 @@ public class AI {
         return alpha;
     }
 
+    private int quiescentSearch(Board board, int alpha, int beta) {
+        maintenance();
+
+        if (board.fifty() >= 100 || status(table.get(board.hash())) == OPEN)
+            return 0;
+
+        int value = evaluateBoardPosition(board);
+
+        if (value >= beta)
+            return beta;
+        if (value > alpha)
+            alpha = value;
+
+        int[] moves = board.moves();
+        int c = MoveGenerator.generateDirtyCaptureMoves(board, moves);
+        int validMoves = 0;
+
+        for (int i = 0; i < c; i++) {
+            sortMoves(i, c, moves);
+
+            Board next = board.move(moves[i]);
+            if (!MoveGenerator.isValid(next))
+                continue;
+
+            validMoves += 1;
+            value = -quiescentSearch(next.nextTurn(), -beta, -alpha);
+            if (value >= beta) {
+                if (validMoves == 1) failHighFirst++;
+                failHigh++;
+                return beta;
+            }
+            if (value > alpha) {
+                alpha = value;
+            }
+        }
+
+        return alpha;
+    }
+
     private void maintenance() {
         nodes += 1;
-        if ((nodes & 1023) == 0)
+        if ((nodes & 0xFFFF) == 0)
             checkTime();
     }
 

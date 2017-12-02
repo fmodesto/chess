@@ -1,0 +1,9 @@
+<< FmoChess v0.1
+>> position start
+processing time: 12
+>> go depth 5
+<< bestmove e2e4
+processing time: 57
+>> go depth 10
+<< bestmove e2e4
+processing time: 75558
