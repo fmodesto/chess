@@ -1,11 +1,18 @@
 package com.fmotech.chess;
 
-import it.unimi.dsi.fastutil.longs.Long2LongMap;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 
 import static com.fmotech.chess.BitOperations.highInt;
 import static com.fmotech.chess.BitOperations.lowInt;
 import static com.fmotech.chess.FenFormatter.moveToFen;
+import static com.fmotech.chess.PvData.BETA;
+import static com.fmotech.chess.PvData.CLOSE;
+import static com.fmotech.chess.PvData.EXACT;
+import static com.fmotech.chess.PvData.OPEN;
+import static com.fmotech.chess.PvData.create;
+import static com.fmotech.chess.PvData.move;
+import static com.fmotech.chess.PvData.score;
+import static com.fmotech.chess.PvData.status;
 import static com.fmotech.chess.SimpleEvaluation.evaluateBoardPosition;
 import static java.lang.Float.max;
 import static java.lang.Math.abs;
@@ -18,6 +25,7 @@ public class AI {
 
     private final long timeout;
     private int nodes;
+    private int initialPly;
     private Long2LongOpenHashMap table = new Long2LongOpenHashMap();
 
     private int failHigh = 0;
@@ -33,13 +41,13 @@ public class AI {
 
     public static void main(String[] args) {
         Board board = Board.INIT;
-        for (int i = 0; i < 100; i++) {
-            board = move(board);
+        while (board.ownKing() != 0) {
+            board = doMove(board);
         }
         System.out.println(board);
     }
 
-    private static Board move(Board board) {
+    private static Board doMove(Board board) {
         AI ai = new AI(10_000);
         int move = ai.think(board);
         return board.move(move).nextTurn();
@@ -49,14 +57,17 @@ public class AI {
         int move = 0;
         int depth = 1;
         try {
+            initialPly = board.ply();
             while (depth < MAX_DEPTH) {
                 long time = System.currentTimeMillis();
                 int score = negaMax(board.ply() + depth, board, MIN_VALUE, MAX_VALUE);
                 time = System.currentTimeMillis() - time;
                 long data = table.get(board.hash());
-                move = lowInt(data);
+                move = move(data);
                 explainMove(board, score, depth, time);
-                if (MAX_VALUE - abs(highInt(data)) <= 512) {
+                if (MAX_VALUE - abs(score(data)) <= 512) {
+                    break;
+                } else if (timeout - System.currentTimeMillis() < 7000) {
                     break;
                 }
                 depth++;
@@ -74,8 +85,8 @@ public class AI {
             long play = table.get(board.hash());
             if (i == 0)
                 System.out.print((board.whiteTurn() ? score : -score) + " ");
-            System.out.print(moveToFen(board, lowInt(play)));
-            board = board.move(lowInt(play)).nextTurn();
+            System.out.print(moveToFen(board, move(play)));
+            board = board.move(move(play)).nextTurn();
             System.out.print(" {" + eval(board) + "} ");
         }
         System.out.println("in " + nodes + " nodes, cutting: " + failHighFirst / max(1F, failHigh)
@@ -88,21 +99,26 @@ public class AI {
     }
 
     private int negaMax(int depth, Board board, int alpha, int beta) {
-        if (board.ply() == depth) return evaluateBoardPosition(board);
+        long hash = board.hash();
+        long data = table.get(hash);
 
-        long data = table.addTo(board.hash(), 0x100000000L);
+        if (board.ply() == depth) {
+            alpha = evaluateBoardPosition(board);
+            table.put(hash, create(CLOSE | EXACT, board.ply(), 0, alpha, move(table.get(hash))));
+            return alpha;
+        }
+        maintenance();
 
-        nodes += 1;
-        if ((nodes & 1023) == 0)
-            checkTime();
+        long status = status(data);
+        if (status == OPEN && board.ply() != initialPly)
+            return 0;
 
-        boolean check = MoveGenerator.isChecked(board);
-        if (check) depth++;
+        table.put(hash, data | OPEN);
 
         int[] moves = board.moves();
         int c = MoveGenerator.generateDirtyMoves(board, moves);
         int validMoves = 0;
-        boolean followPv = sortMoves(c, moves, lowInt(data));
+        boolean followPv = sortMoves(c, moves, move(table.get(hash)));
         boolean foundPv = false;
 
         for (int i = 0; i < c; i++) {
@@ -130,19 +146,28 @@ public class AI {
             if (value >= beta) {
                 if (validMoves == 1) failHighFirst++;
                 failHigh++;
+                table.put(hash, create(status | BETA, board.ply(), depth - board.ply(), beta, moves[i]));
                 return beta;
             }
             if (value > alpha) {
                 alpha = value;
-                table.put(board.hash(), BitOperations.joinInts(alpha, moves[i]));
+                table.put(board.hash(), create(OPEN | EXACT, board.ply(), depth - board.ply(), alpha, moves[i]));
                 foundPv = true;
             }
         }
 
+        table.put(hash, create(status | EXACT, board.ply(), depth - board.ply(), alpha, move(table.get(hash))));
         if (validMoves == 0) {
+            boolean check = MoveGenerator.isChecked(board);
             return check ? MIN_VALUE + board.ply() : 0;
         }
         return alpha;
+    }
+
+    private void maintenance() {
+        nodes += 1;
+        if ((nodes & 1023) == 0)
+            checkTime();
     }
 
     private void sortMoves(int from, int to, int[] moves) {
