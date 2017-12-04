@@ -30,7 +30,7 @@ public class EpdTests {
 
     @Parameterized.Parameters
     public static List<Object[]> data() throws Exception {
-        return EpdReader.read(Paths.get("src/test/resources/eigenmann.epd"))
+        return EpdReader.read(Paths.get("src/test/resources/wacnew.epd"))
                 .map(e -> new Object[] { e })
                 .collect(Collectors.toList());
 
@@ -43,7 +43,7 @@ public class EpdTests {
     @Test
     public void execute() {
         System.out.println(epd.board);
-        AI ai = new AI(60000, 32, epd.board, new long[2]);
+        AI ai = new AI(30000, 32, epd.board, new long[2]);
         int bestMove = ai.think();
         List<Integer> expectedBest = EpdReader.getMoves(epd, "bm");
         ignoreFalse(moveToFen(epd.board, bestMove) + " in [" + EpdReader.getSan(epd, "bm") + "]", expectedBest.contains(bestMove));

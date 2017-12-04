@@ -8,6 +8,7 @@ public class PvData {
     public static final long EXACT = 0x6000_0000_0000_0000L;
     public static final long ALPHA = 0x4000_0000_0000_0000L;
     public static final long BETA = 0x2000_0000_0000_0000L;
+    public static final long UNKNOWN = 0x0000_0000_0000_0000L;
 
     private static final int DEPTH_MASK = 0xF;
     private static final int PLY_MASK = 0x1FF;

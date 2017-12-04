@@ -65,7 +65,7 @@ public class MoveGenerator {
         return !isPositionInAttack(board, kingPosition);
     }
 
-    public static boolean isChecked(Board board) {
+    public static boolean isInCheck(Board board) {
         return !isValid(board);
     }
 

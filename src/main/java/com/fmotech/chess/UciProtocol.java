@@ -32,7 +32,7 @@ public class UciProtocol {
     private static PrintStream logs;
     private static Game game;
 
-    public static void main(String[] args) {
+    public static void execute() {
         commands = Arrays.stream(UciProtocol.class.getMethods())
                 .filter(e -> Modifier.isStatic(e.getModifiers()))
                 .filter(e -> e.getParameterTypes().length == 1 && e.getParameterTypes()[0] == String.class)
@@ -40,7 +40,7 @@ public class UciProtocol {
         Method noOp = commands.get("noop");
         init();
 
-        send("FmoChess v0.1");
+        uci("");
         Scanner scanner = new Scanner(System.in);
         while (scanner.hasNext()) {
             String input = scanner.nextLine();
@@ -70,7 +70,7 @@ public class UciProtocol {
     }
 
     public static void uci(String parameter) {
-        send("id name FmoChess 0.1");
+        send("id name Cheesy 0.1");
         send("id author Francisco Modesto");
         send("id rnd " + ID);
         send("uciok");

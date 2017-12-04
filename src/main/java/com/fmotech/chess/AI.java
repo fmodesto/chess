@@ -3,15 +3,20 @@ package com.fmotech.chess;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 
 import static com.fmotech.chess.FenFormatter.moveToFen;
+import static com.fmotech.chess.MoveGenerator.isInCheck;
+import static com.fmotech.chess.PvData.ALPHA;
 import static com.fmotech.chess.PvData.BETA;
 import static com.fmotech.chess.PvData.CLOSE;
 import static com.fmotech.chess.PvData.EXACT;
 import static com.fmotech.chess.PvData.OPEN;
+import static com.fmotech.chess.PvData.UNKNOWN;
 import static com.fmotech.chess.PvData.create;
+import static com.fmotech.chess.PvData.depth;
 import static com.fmotech.chess.PvData.move;
 import static com.fmotech.chess.PvData.score;
+import static com.fmotech.chess.PvData.scoreType;
 import static com.fmotech.chess.PvData.status;
-import static com.fmotech.chess.SimpleEvaluation.evaluateBoardPosition;
+import static com.fmotech.chess.Evaluation.evaluateBoardPosition;
 import static java.lang.Float.max;
 import static java.lang.Integer.signum;
 import static java.lang.Math.abs;
@@ -63,8 +68,7 @@ public class AI {
             }
         } catch (Timeout e) {
         }
-        depth--;
-        System.out.println(depth + " " + nodes + " " + foundPvCount);
+        System.out.println(board.ply() + " " + board);
         return move;
     }
 
@@ -83,26 +87,33 @@ public class AI {
             System.out.print(moveToFen(board, move) + " ");
             board = board.move(move).nextTurn();
         }
+//        System.out.println();
         System.out.println("\t_ordering " + failHighFirst / max(1F, failHigh)
                 + " _pvs " + (1 - (failFoundPvCount / max(1F, foundPvCount)))
                 + " _table " + table.size());
-    }
-
-    private int eval(Board board) {
-        return board.whiteTurn() ? evaluateBoardPosition(board) : -evaluateBoardPosition(board);
     }
 
     private int negaMax(int depth, Board board, int alpha, int beta) {
         long hash = board.hash();
         long data = table.get(hash);
 
+        int initAlpha = alpha;
+
         long status = status(data);
-        if ((status == OPEN || board.fifty() >= 100) && board.ply() != initialPly)
+        int ply = board.ply();
+        if ((status == OPEN || board.fifty() >= 100) && ply != initialPly)
             return 0;
 
-        if (board.ply() == depth) {
-            alpha = quiescentSearch(board, alpha, beta);
-            table.put(hash, create(CLOSE | EXACT, board.ply(), 0, alpha, move(table.get(hash))));
+        if (depth(data) >= depth - ply && scoreType(data) != UNKNOWN) {
+            if (scoreType(data) != BETA && score(data) <= alpha)
+                return alpha;
+            if (scoreType(data) != ALPHA && score(data) >= beta)
+                return beta;
+        }
+
+        if (ply == depth) {
+            alpha = /*isChecked(board) ? beta :*/ quiescentSearch(board, alpha, beta);
+            recordPv(hash, CLOSE, ply, 0, alpha, move(data), initAlpha, beta);
             return alpha;
         }
 
@@ -115,6 +126,7 @@ public class AI {
         int validMoves = 0;
         boolean followPv = sortMoves(c, moves, move(table.get(hash)));
         boolean foundPv = false;
+        int bestMove = 0;
 
         for (int i = 0; i < c; i++) {
             if (!followPv)
@@ -141,22 +153,30 @@ public class AI {
             if (value >= beta) {
                 if (validMoves == 1) failHighFirst++;
                 failHigh++;
-                table.put(hash, create(status | BETA, board.ply(), depth - board.ply(), beta, moves[i]));
+                table.put(hash, create(status | BETA, ply, depth - ply, beta, moves[i]));
                 return beta;
             }
             if (value > alpha) {
                 alpha = value;
-                table.put(board.hash(), create(OPEN | EXACT, board.ply(), depth - board.ply(), alpha, moves[i]));
+                bestMove = moves[i];
                 foundPv = true;
             }
         }
 
-        table.put(hash, create(status | EXACT, board.ply(), depth - board.ply(), alpha, move(table.get(hash))));
-        if (validMoves == 0) {
-            boolean check = MoveGenerator.isChecked(board);
-            return check ? MIN_VALUE + board.ply() : 0;
-        }
+        if (validMoves == 0)
+            alpha = isInCheck(board) ? MIN_VALUE + ply : 0;
+
+        recordPv(hash, status, ply, depth - ply, alpha, bestMove, initAlpha, beta);
         return alpha;
+    }
+
+    private void recordPv(long hash, long status, int ply, int depth, int score, int move, int alpha, int beta) {
+        if (score == alpha)
+            table.put(hash, create(status | ALPHA, ply, depth, score, move));
+        else if (score == beta)
+            table.put(hash, create(status | BETA, ply, depth, score, move));
+        else
+            table.put(hash, create(status | EXACT, ply, depth, score, move));
     }
 
     private int quiescentSearch(Board board, int alpha, int beta) {

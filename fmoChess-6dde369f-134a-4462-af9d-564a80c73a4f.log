@@ -1,7 +1,0 @@
-<< FmoChess v0.1
->> position startpos
-processing time: 5
->> isready
-<< readyok
-processing time: 0
->> go movetime 1
