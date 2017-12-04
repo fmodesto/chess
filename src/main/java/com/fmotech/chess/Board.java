@@ -1,10 +1,13 @@
 package com.fmotech.chess;
 
 import java.util.Arrays;
+import java.util.Random;
 
+import static com.fmotech.chess.BitOperations.highInt;
+import static com.fmotech.chess.BitOperations.lowInt;
+import static com.fmotech.chess.BitOperations.lowestBitPosition;
+import static com.fmotech.chess.BitOperations.nextLowestBit;
 import static com.fmotech.chess.BitOperations.reverse;
-import static org.apache.commons.lang3.StringUtils.leftPad;
-import static org.apache.commons.lang3.StringUtils.substring;
 
 public class Board {
     private static final long CASTLE = 0x8100000000000081L;
@@ -16,12 +19,13 @@ public class Board {
     private static final long LOW_ROCK = 1L;
     private static final long HIGH_ROCK = 1L << 7;
 
-    public static final int PAWN = 0b001;
-    public static final int ROCK = 0b110;
-    public static final int KNIGHT = 0b010;
+    public static final int KING = 0b100;
+    public static final int QUEEN = 0b110;
+    public static final int ROCK = 0b101;
     public static final int BISHOP = 0b011;
-    public static final int QUEEN = 0b100;
-    public static final int KING = 0b101;
+    public static final int KNIGHT = 0b010;
+    public static final int PAWN = 0b001;
+
     public static final int SPECIAL = 0b111;
 
     public static final int MOVE_CAST_H = 0x80;
@@ -30,31 +34,44 @@ public class Board {
     public static final int MOVE_EP = 0x10;
     public static final int MOVE_PROMO = 0x08;
 
-    public static final Board INIT = Board.of(
+    private static final long HASH1_BITS = 0xDEADBEEFDEADBEEFL;
+    private static final long HASH2_BITS = 0x9E3779B97F4A7C13L;
+
+    public static final Board INIT = Board.of(0,
             0xffff000000000000L,
             0x9900000000000099L,
-            0xe7000000000000e7L,
-            0x2cff00000000ff2cL | CASTLE);
+            0x7600000000000076L | CASTLE,
+            0xa5ff00000000ffa5L);
 
     private Board next;
     private int[] moves = new int[256];
+    private long ply;
     private long b4;
     private long b3;
     private long b2;
     private long b1;
 
-    public static Board of(long b4, long b3, long b2, long b1) {
-        return new Board().set(b4, b3, b2, b1);
+    public static Board of(long ply, long b4, long b3, long b2, long b1) {
+        return new Board().set(ply, b4, b3, b2, b1);
     }
 
-    public static Board of(long color, long pawns, long rocks, long knights, long bishops, long queens, long kings, long enPassant, long castle) {
-        return Board.of(color,
-                rocks | queens | kings | enPassant | castle,
-                rocks | knights | bishops | enPassant | castle,
-                pawns | bishops | kings | enPassant | castle);
+    public static Board of(int ply, int fifty, long color, long pawns, long rocks, long knights, long bishops, long queens, long kings, long enPassant, long castle) {
+        return Board.of(BitOperations.joinInts(fifty, ply), color,
+                queens | kings | rocks | enPassant | castle,
+                queens | knights | bishops | enPassant | castle,
+                pawns | bishops | rocks | enPassant | castle);
     }
 
-    private Board set(long b4, long b3, long b2, long b1) {
+    public static Board fen(String fen) {
+        return FenFormatter.fromFen(fen);
+    }
+
+    public Board cloneBoard() {
+        return Board.of(ply, b4, b3, b2, b1);
+    }
+
+    private Board set(long ply, long b4, long b3, long b2, long b1) {
+        this.ply = ply;
         this.b4 = b4;
         this.b3 = b3;
         this.b2 = b2;
@@ -70,7 +87,19 @@ public class Board {
     }
 
     public Board nextTurn() {
-        return nextBoard().set(reverse(~b4), reverse(b3), reverse(b2), reverse(b1));
+        return nextBoard().set(ply + 1, reverse(~b4), reverse(b3), reverse(b2), reverse(b1));
+    }
+
+    public int ply() {
+        return lowInt(ply);
+    }
+
+    public int fullMove() {
+        return (lowInt(ply) / 2) + 1;
+    }
+
+    public int fifty() {
+        return lowInt(ply) - highInt(ply);
     }
 
     public int[] moves() {
@@ -86,6 +115,7 @@ public class Board {
     }
 
     public Board move(long src, long dest, int promotion) {
+        long currentPly = ply();
         if ((src & ownPawns()) != 0) {
             long oldEnPassant = enPassant();
             long newEnPassant = (src << 8) & (dest >>> 8);
@@ -103,40 +133,40 @@ public class Board {
             b3 |= newEnPassant | p3;
             b2 |= newEnPassant | p2;
             b1 |= newEnPassant | p1;
-            return nextBoard().set(b4, b3, b2, b1);
-        } else if ((src & b3 & b1 & RANK_1) != 0) {
-            if (src == ownKing()) {
-                long castle = 0;
-                long castleClear = 0;
-                if (src >>> 2 == dest) {
-                    castleClear = 1L;
-                    castle = src >>> 1;
-                } else if (src << 2 == dest) {
-                    castleClear = 1L << 7;
-                    castle = src << 1;
-                }
-                long clear = ~(src | dest | castle | enPassant() | castleClear);
-                long b4 = this.b4 & clear;
-                long b3 = this.b3 & clear;
-                long b2 = this.b2 & clear;
-                long b1 = this.b1 & clear & ~(castle() & RANK_1);
-                b4 |= whiteTurn() ? 0 : src | (enPassant() & ~dest) | castleClear;
-                b3 |= dest | castle;
-                b2 |= castle;
-                b1 |= dest;
-                return nextBoard().set(b4, b3, b2, b1);
-            } else /* Rocks */ {
-                long clear = ~(src | dest | enPassant());
-                long b4 = this.b4 & clear;
-                long b3 = this.b3 & clear;
-                long b2 = this.b2 & clear;
-                long b1 = this.b1 & clear;
-                b4 |= whiteTurn() ? 0 : src | (enPassant() & ~dest);
-                b3 |= dest;
-                b2 |= dest;
-                b1 |= 0;
-                return nextBoard().set(b4, b3, b2, b1);
+            return nextBoard().set((currentPly + 1) << 32 | currentPly, b4, b3, b2, b1);
+        } else if ((src & ownKing() & RANK_1) != 0) {
+            long castle = 0;
+            long castleClear = 0;
+            if (src >>> 2 == dest) {
+                castleClear = 1L;
+                castle = src >>> 1;
+            } else if (src << 2 == dest) {
+                castleClear = 1L << 7;
+                castle = src << 1;
             }
+            long clear = ~(src | dest | castle | enPassant() | castleClear);
+            long b4 = this.b4 & clear;
+            long b3 = this.b3 & clear;
+            long b2 = this.b2 & clear & ~(castle() & RANK_1);
+            long b1 = this.b1 & clear;
+            b4 |= whiteTurn() ? 0 : src | (enPassant() & ~dest) | castleClear;
+            b3 |= dest | castle;
+            b2 |= 0;
+            b1 |= castle;
+            long ply = (dest & enemyPieces()) == 0 ? this.ply : (currentPly + 1) << 32 | currentPly;
+            return nextBoard().set(ply, b4, b3, b2, b1);
+        } else if ((src & ownRocks() & RANK_1) != 0) {
+            long clear = ~(src | dest | enPassant());
+            long b4 = this.b4 & clear;
+            long b3 = this.b3 & clear;
+            long b2 = this.b2 & clear;
+            long b1 = this.b1 & clear;
+            b4 |= whiteTurn() ? 0 : src | (enPassant() & ~dest);
+            b3 |= dest;
+            b2 |= 0;
+            b1 |= dest;
+            long ply = (dest & enemyPieces()) == 0 ? this.ply : (currentPly + 1) << 32 | currentPly;
+            return nextBoard().set(ply, b4, b3, b2, b1);
         } else {
             long clear = ~(src | dest | enPassant());
             long b4 = this.b4 & clear;
@@ -147,7 +177,8 @@ public class Board {
             b3 |= ((this.b3 & src) != 0) ? dest : 0;
             b2 |= ((this.b2 & src) != 0) ? dest : 0;
             b1 |= ((this.b1 & src) != 0) ? dest : 0;
-            return nextBoard().set(b4, b3, b2, b1);
+            long ply = (dest & enemyPieces()) == 0 ? this.ply : (currentPly + 1) << 32 | currentPly;
+            return nextBoard().set(ply, b4, b3, b2, b1);
         }
     }
 
@@ -199,7 +230,7 @@ public class Board {
     }
 
     public long ownRocks() {
-        return ~b4 & b3 & b2 & (~b1 | CASTLE);
+        return ~b4 & b3 & (~b2 | CASTLE) & b1;
     }
 
     public long ownKnights() {
@@ -211,17 +242,17 @@ public class Board {
     }
 
     public long ownQueens() {
-        return ~b4 & b3 & ~b2 & ~b1;
+        return ~b4 & b3 & b2 & ~b1;
     }
 
     public long ownKing() {
-        return ~b4 & b3 & ~b2 & b1;
+        return ~b4 & b3 & ~b2 & ~b1;
     }
 
     // Enemy pieces
 
     public long enemyPieces() {
-        return ~b4 & pieces();
+        return b4 & pieces();
     }
 
     public long enemyPawns() {
@@ -229,7 +260,7 @@ public class Board {
     }
 
     public long enemyRocks() {
-        return b4 & b3 & b2 & (~b1 | CASTLE);
+        return b4 & b3 & (~b2 | CASTLE) & b1;
     }
 
     public long enemyKnights() {
@@ -241,11 +272,11 @@ public class Board {
     }
 
     public long enemyQueens() {
-        return b4 & b3 & ~b2 & ~b1;
+        return b4 & b3 & b2 & ~b1;
     }
 
     public long enemyKing() {
-        return b4 & b3 & ~b2 & b1;
+        return b4 & b3 & ~b2 & ~b1;
     }
 
     @Override
@@ -262,15 +293,60 @@ public class Board {
 
     @Override
     public int hashCode() {
-        int result = (int) (b4 ^ (b4 >>> 32));
-        result = 31 * result + (int) (b3 ^ (b3 >>> 32));
-        result = 31 * result + (int) (b2 ^ (b2 >>> 32));
-        result = 31 * result + (int) (b1 ^ (b1 >>> 32));
-        return result;
+        long hash = hash();
+        return (int) (hash ^ (hash >>> 32));
     }
 
     @Override
     public String toString() {
-        return FenFormatter.toFen(this) + " " + leftPad(Long.toHexString(b4), 8, '0');
+        return DebugUtils.toHexString(hash()) + " " + FenFormatter.toFen(this);
+    }
+
+    public long hash() {
+        // Spooky Hash 64
+        // Extracted from David Curtis: https://github.com/mayconbordin/streaminer/blob/master/src/main/java/org/streaminer/util/hash/SpookyHash64.java
+        // Licensed under the Apache License, Version 2.0 (the "License") http://www.apache.org/licenses/LICENSE-2.0
+
+        long h0, h1, h2, h3;
+        h0 = HASH2_BITS;
+        h1 = HASH2_BITS;
+        h2 = HASH1_BITS;
+        h3 = HASH1_BITS;
+
+        h2 += b4;
+        h3 += b3;
+
+        h2 = (h2 << 50) | (h2 >>> 14);  h2 += h3;  h0 ^= h2;
+        h3 = (h3 << 52) | (h3 >>> 12);  h3 += h0;  h1 ^= h3;
+        h0 = (h0 << 30) | (h0 >>> 34);  h0 += h1;  h2 ^= h0;
+        h1 = (h1 << 41) | (h1 >>> 23);  h1 += h2;  h3 ^= h1;
+        h2 = (h2 << 54) | (h2 >>> 10);  h2 += h3;  h0 ^= h2;
+        h3 = (h3 << 48) | (h3 >>> 16);  h3 += h0;  h1 ^= h3;
+        h0 = (h0 << 38) | (h0 >>> 26);  h0 += h1;  h2 ^= h0;
+        h1 = (h1 << 37) | (h1 >>> 27);  h1 += h2;  h3 ^= h1;
+        h2 = (h2 << 62) | (h2 >>> 2);   h2 += h3;  h0 ^= h2;
+        h3 = (h3 << 34) | (h3 >>> 30);  h3 += h0;  h1 ^= h3;
+        h0 = (h0 << 5)  | (h0 >>> 59);  h0 += h1;  h2 ^= h0;
+        h1 = (h1 << 36) | (h1 >>> 28);  h1 += h2;  h3 ^= h1;
+
+        h0 += b2;
+        h1 += b1;
+
+        h2 += HASH1_BITS;
+        h3 += HASH1_BITS;
+
+        h3 ^= h2;  h2 = (h2 << 15) | (h2 >>> 49);  h3 += h2;
+        h0 ^= h3;  h3 = (h3 << 52) | (h3 >>> 12);  h0 += h3;
+        h1 ^= h0;  h0 = (h0 << 26) | (h0 >>> 38);  h1 += h0;
+        h2 ^= h1;  h1 = (h1 << 51) | (h1 >>> 13);  h2 += h1;
+        h3 ^= h2;  h2 = (h2 << 28) | (h2 >>> 36);  h3 += h2;
+        h0 ^= h3;  h3 = (h3 << 9)  | (h3 >>> 55);  h0 += h3;
+        h1 ^= h0;  h0 = (h0 << 47) | (h0 >>> 17);  h1 += h0;
+        h2 ^= h1;  h1 = (h1 << 54) | (h1 >>> 10);  h2 += h1;
+        h3 ^= h2;  h2 = (h2 << 32) | (h2 >>> 32);  h3 += h2;
+        h0 ^= h3;  h3 = (h3 << 25) | (h3 >>> 39);  h0 += h3;
+        h1 ^= h0;  h0 = (h0 << 63) | (h0 >>> 1);   h1 += h0;
+
+        return h0;
     }
 }

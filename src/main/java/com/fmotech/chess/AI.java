@@ -1,225 +1,258 @@
 package com.fmotech.chess;
 
-import java.util.Random;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 
-import static com.fmotech.chess.DebugUtils.timeExecuting;
 import static com.fmotech.chess.FenFormatter.moveToFen;
-import static com.fmotech.chess.SimpleEvaluation.evaluateBoardPosition;
+import static com.fmotech.chess.MoveGenerator.isInCheck;
+import static com.fmotech.chess.PvData.ALPHA;
+import static com.fmotech.chess.PvData.BETA;
+import static com.fmotech.chess.PvData.CLOSE;
+import static com.fmotech.chess.PvData.EXACT;
+import static com.fmotech.chess.PvData.OPEN;
+import static com.fmotech.chess.PvData.UNKNOWN;
+import static com.fmotech.chess.PvData.create;
+import static com.fmotech.chess.PvData.depth;
+import static com.fmotech.chess.PvData.move;
+import static com.fmotech.chess.PvData.score;
+import static com.fmotech.chess.PvData.scoreType;
+import static com.fmotech.chess.PvData.status;
+import static com.fmotech.chess.Evaluation.evaluateBoardPosition;
+import static java.lang.Float.max;
+import static java.lang.Integer.signum;
+import static java.lang.Math.abs;
 
 public class AI {
 
-    private static final int MIN_VALUE = -1000000;
-    private static final int MAX_VALUE = 1000000;
-    private static Random random = new Random();
+    private static final int MIN_VALUE = -32000;
+    private static final int MAX_VALUE = 32000;
 
-    public static void main(String[] args) {
-        Board b = FenFormatter.fromFen("7r/3p1k2/2p2p2/1n3Kp1/8/8/7P/7R b - - 11 45");
-//        Board b = Board.INIT;
-        b = b.move(FenFormatter.moveFromFen(b, "h8h4")).nextTurn();
-        b = b.move(FenFormatter.moveFromFen(b, "h1a1")).nextTurn();
-        c = 0;
-        final Board board = b;
-        System.out.println(timeExecuting(() -> negaMax(6, board, true)));
-        System.out.println(c);
-//        c = 0;
-//        System.out.println(timeExecuting(() -> minMax(6, board, true)));
-//        System.out.println(c);
-        c = 0;
-        System.out.println(timeExecuting(() -> negaMax(6, board, true, MIN_VALUE, MAX_VALUE)));
-        System.out.println(c);
-//        c = 0;
-//        System.out.println(timeExecuting(() -> minMax(6, board, true)));
-//        System.out.println(c);
-    }
-    static long c = 0;
+    private final long timeout;
+    private final int maxDepth;
+    private int nodes;
+    private int initialPly;
+    private Long2LongOpenHashMap table = new Long2LongOpenHashMap();
 
-    public static int bestMove(Board board) {
-        long result = negaMax(6, board, true, MIN_VALUE, MAX_VALUE);
-        return (int) (result >>> 32);
+    private int failHigh = 0;
+    private int failHighFirst = 0;
+    private int failFoundPvCount = 0;
+    private int foundPvCount = 0;
+    private final Board board;
+
+    public AI(int millis, int maxDepth, Board board, long[] hashes) {
+        this.timeout = System.currentTimeMillis() + (millis <= 0 ? Integer.MAX_VALUE : millis);
+        this.maxDepth = maxDepth;
+        this.board = board;
+        for (int i = board.ply() - 2; i >= board.ply() - board.fifty(); i--) {
+            table.put(hashes[i], OPEN);
+        }
     }
 
-    private static long negaMax(int depth, Board board, boolean firstTime) {
-        if (depth == 0) return evaluateBoardPosition(board);
+    public static class Timeout extends RuntimeException {}
 
-        c += 1;
-        int bestScore = MIN_VALUE;
-        long bestMove = 0;
-
-        int[] moves = board.moves();
-        int c = MoveGenerator.generateDirtyMoves(board, moves);
-//        if (firstTime) {
-////            shuffle(moves, c);
-//        }
-
-        String scores = "";
-        for (int i = 0; i < c; i++) {
-            Board next = board.move(moves[i]);
-            if (MoveGenerator.isValid(next)) {
-                int score = -(int) (negaMax(depth - 1, next.nextTurn(), false) & 0xFFFFFFFFL);
-                scores += " " + score;// + ":" + moveToFen(board, moves[i]);
-                if (score >= bestScore) {
-                    bestScore = score;
-                    bestMove = moves[i];
+    public int think() {
+        int move = 0;
+        int depth = 1;
+        try {
+            initialPly = board.ply();
+            while (depth <= maxDepth) {
+                long time = System.currentTimeMillis();
+                int score = negaMax(board.ply() + depth, board, MIN_VALUE, MAX_VALUE);
+                time = System.currentTimeMillis() - time;
+                long data = table.get(board.hash());
+                move = move(data);
+                explainMove(board, score, depth, time);
+                depth++;
+                if (MAX_VALUE - abs(score(data)) <= 512) {
+                    break;
                 }
             }
+        } catch (Timeout e) {
         }
-
-        if (firstTime)
-            System.out.println("NegaMaxDepth: " + depth + "." + scores + ". Choosing " + moveToFen(board, (int) bestMove) + " " + bestScore);
-        return bestMove << 32 | (bestScore & 0xFFFFFFFFL);
+        System.out.println(board.ply() + " " + board);
+        return move;
     }
 
-    private static long negaMax(int depth, Board board, boolean firstTime, int alpha, int beta) {
-        if (depth == 0) return evaluateBoardPosition(board);
+    private void explainMove(Board board, int score, int depth, long time) {
+        String sc = "cp " + score;
+        if (MAX_VALUE - abs(score) <= 512) {
+            int sign = signum(score);
+            sc = "mate " + sign * (MAX_VALUE - abs(score) - board.ply());
+        }
+        System.out.printf("info score %s depth %d nodes %d time %d pv ", sc, depth, nodes, time);
 
-        c += 1;
-        int bestValue = MIN_VALUE;
-        long bestMove = 0;
+        for (int i = 0; i < depth; i++) {
+            long play = table.get(board.hash());
+            int move = move(play);
+            if (move == 0) break;
+            System.out.print(moveToFen(board, move) + " ");
+            board = board.move(move).nextTurn();
+        }
+//        System.out.println();
+        System.out.println("\t_ordering " + failHighFirst / max(1F, failHigh)
+                + " _pvs " + (1 - (failFoundPvCount / max(1F, foundPvCount)))
+                + " _table " + table.size());
+    }
+
+    private int negaMax(int depth, Board board, int alpha, int beta) {
+        long hash = board.hash();
+        long data = table.get(hash);
+
+        int initAlpha = alpha;
+
+        long status = status(data);
+        int ply = board.ply();
+        if ((status == OPEN || board.fifty() >= 100) && ply != initialPly)
+            return 0;
+
+        if (depth(data) >= depth - ply && scoreType(data) != UNKNOWN) {
+            if (scoreType(data) != BETA && score(data) <= alpha)
+                return alpha;
+            if (scoreType(data) != ALPHA && score(data) >= beta)
+                return beta;
+        }
+
+        if (ply == depth) {
+            alpha = /*isChecked(board) ? beta :*/ quiescentSearch(board, alpha, beta);
+            recordPv(hash, CLOSE, ply, 0, alpha, move(data), initAlpha, beta);
+            return alpha;
+        }
+
+        maintenance();
+
+        table.put(hash, data | OPEN);
 
         int[] moves = board.moves();
         int c = MoveGenerator.generateDirtyMoves(board, moves);
-        if (firstTime) {
-            shuffle(moves, c);
-        }
-//        Arrays.sort(moves, 0, c);
-
-        String scores = "";
-        for (int i = 0; i < c; i++) {
-            Board next = board.move(moves[i]);
-            if (MoveGenerator.isValid(next)) {
-                int value = -((int) (negaMax(depth - 1, next.nextTurn(), false, -beta, -alpha) & 0xFFFFFFFFL));
-                scores += " " + value;// + ":" + moveToFen(board, moves[i]);
-                if (value >= bestValue) {
-                    bestValue = value;
-                    bestMove = moves[i];
-                }
-                alpha = Math.max(alpha, value);
-                if (alpha >= beta) break;
-            }//
-        }
-/*
-[Event "Scid vs. Mac"]
-[Site "?"]
-[Date "2017.11.19"]
-[Round "1"]
-[White "FmoChess"]
-[Black "Fmochess2"]
-[Result "*"]
-[Movetime "10"]
-
-1.f3 e5 2.c3 Qf6 3.d4 exd4 4.Qxd4 Qxd4 5.cxd4 b6 6.Bf4 c5 7.dxc5 Bxc5 8.Be5 f6 9.Bf4 Bd4 10.a3 Ne7 11.Nh3 Kd8 12.Nd2 Ng6 13.Bxb8 Rxb8 14.Rb1 Nf8 15.g3 Bc5 16.Ra1 Ne6 17.Nf4 Nxf4 18.gxf4 Ke7 19.Rd1 Be3 20.h3 Bb7 21.f5 Bg5 22.h4 Be3 23.Rh2 Rbe8 24.a4 Bf4 25.Rg2 b5 26.Nb1 g5 27.hxg5 bxa4 28.gxf6+ Kxf6 29.Rd3 Bc6 30.e4 Bc7 31.Re3 Bb6 32.Rd3 d5 33.Rg3 Bc7 34.Rg2 dxe4 35.fxe4 Bxe4 36.Kd1 Bf4 37.Nc3 Bxg2 38.Bxg2 Rhg8 39.Nd5+ Ke5 40.Nxf4 Kxf4 41.Bh3 Kg5 42.Rg3+ Kh5 43.Ra3 Kh4 44.Bf1 Rg1 45.Kd2 Rxf1 46.Rxa4+ Kg3 47.Ra3+ Kh4 48.Rxa7 Kg3 49.Rxh7 Rf2+ 50.Kc3 Rf3+ 51.Kd4 Rf2 52.Kd5 Rxf5+ 53.Kc6 Ra8 54.Rg7+ Kh4 55.Rc7 Re5 56.Kb7 Raa5 57.Rc4+ Kh3 58.Kc6 Rh5 59.Kc7 Rad5 60.Rc3+ Kg4 61.Rc1 Rhf5 62.b4 Kh4 63.Kc8 Kh5 64.Kc7 Kh6 65.Rc2 *
-[Event "Scid vs. Mac"]
-[Site "?"]
-[Date "2017.11.19"]
-[Round "1"]
-[White "FmoChess"]
-[Black "Fmochess2"]
-[Result "*"]
-[Movetime "10"]
-
-1.f3 e5 2.c3 Qf6 3.d4 exd4 4.Qxd4 Qxd4 5.cxd4 b6 6.Bf4 c5 7.dxc5 Bxc5 8.Be5 f6 9.Bf4 Bd4 10.a3 Ne7 11.Nh3 Kd8 12.Nd2 Ng6 13.Bxb8 Rxb8 14.Rb1 Nf8 15.g3 Bc5 16.Ra1 Ne6 17.Nf4 Nxf4 18.gxf4 Ke7 19.Rd1 Be3 20.h3 Bb7 21.f5 Bg5 22.h4 Be3 23.Rh2 Rbe8 24.a4 Bf4 25.Rg2 b5 26.Nb1 g5 27.hxg5 bxa4 28.gxf6+ Kxf6 29.Rd3 Bc6 30.e4 Bc7 31.Re3 Bb6 32.Rd3 d5 33.Rg3 Bc7 34.Rg2 dxe4 35.fxe4 Bxe4 36.Kd1 Bf4 37.Nc3 Bxg2 38.Bxg2 Rhg8 39.Nd5+ Ke5 40.Nxf4 Kxf4 41.Bh3 Kg5 42.Rg3+ Kh5 43.Ra3 Kh4 44.Bf1 Rg1 45.Kd2 Rxf1 46.Rxa4+ Kg3 47.Ra3+ Kh4 48.Rxa7 Kg3 49.Rxh7 Rf2+ 50.Kc3 Rf3+ 51.Kd4 Rf2 52.Kd5 Rxf5+ 53.Kc6 Ra8 54.Rg7+ Kh4 55.Rc7 Re5 56.Kb7 Raa5 57.Rc4+ Kh3 58.Kc6 Rh5 59.Kc7 Rad5 60.Rc3+ Kg4 61.Rc1 Rhf5 62.b4 Kh4 63.Kc8 Kh5 64.Kc7 Kh6 65.Rc2 Rf6 66.Re2 Rfd6 67.Re3 Ra6 68.Re2 Ra3 69.Rg2 Re3 70.Rg1 Rd2 71.Rf1 Kg6 72.Ra1 Kh7 73.Rh1+ Kg7 74.Kb7 Re6 75.Rg1+ Kh7 76.Ka8 Ree2 77.Kb7 Rd7+ 78.Kc8 Rd4 79.b5 Ra2 80.Rc1 Kg7 81.Rg1+ Kh7 82.Rh1+ Kg6 83.Re1 Rc2+ 84.Kb8 Kf5 85.Ra1 Rh2 86.Kc7 Rhh4 87.Rf1+ Kg4 88.Rb1 Kf4 89.Kb8 Kf5 90.Rc1 Rh5 91.b6 Ra4 92.Rg1 Rf4 93.Ka7 Rh6 94.Rc1 Rf2 95.Rc7 Rf1 96.Kb7 Ra1 97.Rc4 Re6 98.Rc5+ Kg6 99.Kc7 Kf6 100.Rh5 Rb1 101.Ra5 Rexb6 102.Ra3 R1b5 103.Ra1 Ke7 104.Ra8 Rg6 105.Ra3 Rd6 106.Ra4 Rf6 107.Ra2 Rff5 108.Ra6 Rf8 109.Ra7 Rh5 110.Ra3 Rh7 111.Ra5 Ke6+ 112.Kb6 Rd7 113.Ra3 Rh8 114.Ra7 Re8 115.Ra3 Rde7 116.Ra5 Rd7 117.Ra1 Rh8 118.Ra4 Kf7 119.Kc5 Rh3 120.Ra5 Rh4 121.Ra8 Rh2 122.Kc4 Rf2 123.Kc3 Kg6 124.Rc8 Rf5 125.Rc6+ Kg5 126.Re6 Rdd5 127.Re3 Rfe5 128.Rxe5+ Rxe5 129.Kd4 Kf4 130.Kd3 Kg3 131.Kc4 Kf2 132.Kd4 Re7 133.Kd5 Kg1 134.Kc4 Re6 135.Kc5 Re5+ 136.Kc4 Re7 137.Kb4 Rf7 138.Ka4 Kh1 139.Ka3 Rf1 140.Ka4 Rf4+ 141.Ka5 Rf6 142.Kb4 Rh6 143.Ka3 Rh7 144.Kb4 Rh3 145.Kc4 Ra3 146.Kb4 Rf3 147.Kc5 *
-
- */
-        if (firstTime)
-            System.out.println("NegaMaxDepth: " + depth + "." + scores + ". Choosing " + moveToFen(board, (int) bestMove) + " " + bestValue);
-        return bestMove << 32 | (bestValue & 0xFFFFFFFFL);
-    }
-
-    private static int minMax(int depth, Board board, boolean firstTime) {
-        if (board.whiteTurn()) {
-            return (int) (max(depth, board, firstTime) >>> 32);
-        } else {
-            return (int) (min(depth, board, firstTime) >>> 32);
-        }
-    }
-
-    private static long max(int depth, Board board, boolean firstTime) {
-        if (depth == 0) return board.whiteTurn() ? evaluateBoardPosition(board) : -evaluateBoardPosition(board);
-
-        c += 1;
-        long bestScore = MIN_VALUE;
-        long bestMove = 0;
-        StringBuilder sb = new StringBuilder();
-        sb.append("MaxDepth: ").append(depth).append(".");
-
-        int[] moves = board.moves();
-        int c = MoveGenerator.generateDirtyMoves(board, moves);
-
-        for (int i = 0; i < c; i++) {
-            Board next = board.move(moves[i]);
-            if (MoveGenerator.isValid(next)) {
-                int score = (int) (min(depth - 1, next.nextTurn(), false) & 0xFFFFFFFFL);
-                sb.append(" ").append(score);
-                if (score >= bestScore) {
-                    bestScore = score;
-                    bestMove = moves[i];
-                }
-            }
-        }
-        sb.append(". Choosing move: ").append(moveToFen(board, (int) bestMove)).append(" ").append(String.format("%-4d", bestScore));
-        if (firstTime)
-            System.out.println(sb);
-        return bestMove << 32 | (bestScore & 0xFFFFFFFFL);
-    }
-
-    private static long min(int depth, Board board, boolean firstTime) {
-        if (depth == 0) return board.whiteTurn() ? evaluateBoardPosition(board) : -evaluateBoardPosition(board);
-
-        c += 1;
-        long bestScore = MAX_VALUE;
-        long bestMove = 0;
-        StringBuilder sb = new StringBuilder();
-        sb.append("MinDepth: ").append(depth).append(".");
-
-        int[] moves = board.moves();
-        int c = MoveGenerator.generateDirtyMoves(board, moves);
-
-        for (int i = 0; i < c; i++) {
-            Board next = board.move(moves[i]);
-            if (MoveGenerator.isValid(next)) {
-                int score = (int) (max(depth - 1, next.nextTurn(), false) & 0xFFFFFFFFL);
-                sb.append(" ").append(score);
-                if (score <= bestScore) {
-                    bestScore = score;
-                    bestMove = moves[i];
-                }
-            }
-        }
-        sb.append(". Choosing move: ").append(moveToFen(board, (int) bestMove)).append(" ").append(String.format("%-4d", bestScore));
-        if (firstTime)
-            System.out.println(sb);
-        return bestMove << 32 | (bestScore & 0xFFFFFFFFL);
-    }
-
-    private static int positionEvaluation(Board board) {
-        int[] moves = board.moves();
-        int c = MoveGenerator.generateValidMoves(board, moves);
-        shuffle(moves, c);
-        int bestScore = MIN_VALUE;
+        int validMoves = 0;
+        boolean followPv = sortMoves(c, moves, move(table.get(hash)));
+        boolean foundPv = false;
         int bestMove = 0;
+
         for (int i = 0; i < c; i++) {
+            if (!followPv)
+                sortMoves(i, c, moves);
+            followPv = false;
+
             Board next = board.move(moves[i]);
-            int score = SimpleEvaluation.evaluateBoardCount(next);
-            if (score > bestScore) {
-                bestScore = score;
+            if (!MoveGenerator.isValid(next))
+                continue;
+
+            validMoves += 1;
+            int value;
+            if (foundPv) {
+                foundPvCount++;
+                value = -negaMax(depth, next.nextTurn(), -alpha - 1, -alpha);
+                if ((value > alpha) && (value < beta)) {
+                    // Check for failure.
+                    value = -negaMax(depth, next.nextTurn(), -beta, -alpha);
+                    failFoundPvCount++;
+                }
+            } else {
+                value = -negaMax(depth, next.nextTurn(), -beta, -alpha);
+            }
+            if (value >= beta) {
+                if (validMoves == 1) failHighFirst++;
+                failHigh++;
+                table.put(hash, create(status | BETA, ply, depth - ply, beta, moves[i]));
+                return beta;
+            }
+            if (value > alpha) {
+                alpha = value;
                 bestMove = moves[i];
+                foundPv = true;
             }
         }
-        return bestMove;
+
+        if (validMoves == 0)
+            alpha = isInCheck(board) ? MIN_VALUE + ply : 0;
+
+        recordPv(hash, status, ply, depth - ply, alpha, bestMove, initAlpha, beta);
+        return alpha;
     }
 
-    private static void shuffle(int[] moves, int c) {
-        for (int i = c - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            int tmp = moves[i];
-            moves[i] = moves[index];
-            moves[index] = tmp;
-        }
+    private void recordPv(long hash, long status, int ply, int depth, int score, int move, int alpha, int beta) {
+        if (score == alpha)
+            table.put(hash, create(status | ALPHA, ply, depth, score, move));
+        else if (score == beta)
+            table.put(hash, create(status | BETA, ply, depth, score, move));
+        else
+            table.put(hash, create(status | EXACT, ply, depth, score, move));
     }
 
-    private static int randomMove(Board board) {
+    private int quiescentSearch(Board board, int alpha, int beta) {
+        maintenance();
+
+        if (board.fifty() >= 100 || status(table.get(board.hash())) == OPEN)
+            return 0;
+
+        int value = evaluateBoardPosition(board);
+
+        if (value >= beta)
+            return beta;
+        if (value > alpha)
+            alpha = value;
+
         int[] moves = board.moves();
-        int c = MoveGenerator.generateValidMoves(board, moves);
-        return moves[random.nextInt(c)];
+        int c = MoveGenerator.generateDirtyCaptureMoves(board, moves);
+        int validMoves = 0;
+
+        for (int i = 0; i < c; i++) {
+            sortMoves(i, c, moves);
+
+            Board next = board.move(moves[i]);
+            if (!MoveGenerator.isValid(next))
+                continue;
+
+            validMoves += 1;
+            value = -quiescentSearch(next.nextTurn(), -beta, -alpha);
+            if (value >= beta) {
+                if (validMoves == 1) failHighFirst++;
+                failHigh++;
+                return beta;
+            }
+            if (value > alpha) {
+                alpha = value;
+            }
+        }
+
+        return alpha;
+    }
+
+    private void maintenance() {
+        nodes += 1;
+        if ((nodes & 0xFFFF) == 0)
+            checkTime();
+    }
+
+    private void sortMoves(int from, int to, int[] moves) {
+        int index = from;
+        int best = (moves[from] >>> 16) & 0xFF;
+        for (int i = from + 1; i < to; i++) {
+            if (((moves[i] >>> 16) & 0xFF) > best) {
+                best = (moves[i] >>> 16) & 0xFF;
+                index = i;
+            }
+        }
+
+        int t = moves[from];
+        moves[from] = moves[index];
+        moves[index] = t;
+    }
+
+    private boolean sortMoves(int size, int[] moves, int pv) {
+        if (pv == 0) return false;
+        for (int i = 0; i < size; i++) {
+            if (moves[i] == pv) {
+                moves[i] = moves[0];
+                moves[0] = pv;
+            }
+        }
+        return moves[0] == pv;
+    }
+
+    private void checkTime() {
+        if (System.currentTimeMillis() > timeout) {
+            throw new Timeout();
+        }
     }
 }

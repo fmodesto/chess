@@ -6,7 +6,9 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
 import static java.time.LocalDateTime.now;
+import static org.apache.commons.lang3.StringUtils.leftPad;
 
+@SuppressWarnings("unused")
 public class DebugUtils {
 
     public static final String CHESS = "♙♖♘♗♕♔♟♜♞♝♛♚";
@@ -48,7 +50,7 @@ public class DebugUtils {
             s += 1;
         }
         if ((enPassant & 0x0000_FF00_0000_0000L) != 0) color |= enPassant;
-        Board board = Board.of(color, pawns, rocks, knights, bishops, queens, kings, enPassant, castle);
+        Board board = Board.of(0, 0, color, pawns, rocks, knights, bishops, queens, kings, enPassant, castle);
         return whiteTurn ? board : board.nextTurn();
     }
 
@@ -65,7 +67,7 @@ public class DebugUtils {
     }
 
     public static void debug(String symbols, int type, long board) {
-        debug(symbols, Board.of(0, test(type, 0b100) ? board : 0, test(type, 0b010) ? board : 0, test(type, 0b001) ? board : 0));
+        debug(symbols, Board.of(0, 0, test(type, 0b100) ? board : 0, test(type, 0b010) ? board : 0, test(type, 0b001) ? board : 0));
     }
 
     private static boolean test(int type, int mask) {
@@ -109,7 +111,15 @@ public class DebugUtils {
         return StringUtils.replaceChars(sb.toString(), FEN, symbols);
     }
 
-    public static interface Thunk { void apply(); }
+    public static String toHexString(long l) {
+        return leftPad(Long.toHexString(l), 16, '0');
+    }
+
+    public static String toHexString(int i) {
+        return leftPad(Integer.toHexString(i), 8, '0');
+    }
+
+    public interface Thunk { void apply(); }
     public static long timeExecuting(Thunk thunk) {
         LocalDateTime start = now();
         thunk.apply();

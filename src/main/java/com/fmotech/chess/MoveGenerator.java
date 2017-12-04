@@ -30,6 +30,8 @@ public class MoveGenerator {
 
     private static final long PAWN_RANK = 0x000000000000ff00L;
     private static final long RANK_7 = 0x00FF0000_00000000L;
+    private static final long NONE = -1L;
+    private static final int KING_MASK = 0x8 | KING;
 
     public static long countMoves(int level, Board board) {
         if (level == 0) return 1;
@@ -63,44 +65,51 @@ public class MoveGenerator {
         return !isPositionInAttack(board, kingPosition);
     }
 
+    public static boolean isInCheck(Board board) {
+        return !isValid(board);
+    }
+
     public static int generateDirtyMoves(Board board, int[] moves) {
         int counter = 0;
         counter = generatePawnMoves(board, counter, moves);
-        counter = generateRocksMoves(board, counter, moves);
+        counter = generateRocksMoves(board, NONE, counter, moves);
         counter = generateKnightMoves(board, counter, moves);
-        counter = generateBishopsMoves(board, counter, moves);
-        counter = generateQueensMoves(board, counter, moves);
+        counter = generateBishopsMoves(board, NONE, counter, moves);
+        counter = generateQueensMoves(board, NONE, counter, moves);
         counter = generateKingMoves(board, counter, moves);
         return counter;
     }
 
-    private static int generatePawnMoves(Board board, int counter, int[] moves) {
-        long pieces = board.pieces() | board.enPassant();
+    public static int generateDirtyCaptureMoves(Board board, int[] moves) {
+        int counter = 0;
+        counter = generatePawnAttackMoves(board, counter, moves);
+        counter = generateRocksMoves(board, board.enemyPieces(), counter, moves);
+        counter = generateKnightAttackMoves(board, counter, moves);
+        counter = generateBishopsMoves(board, board.enemyPieces(), counter, moves);
+        counter = generateQueensMoves(board, board.enemyPieces(), counter, moves);
+        counter = generateKingAttackMoves(board, counter, moves);
+        return counter;
+    }
+
+    private static int generateKingAttackMoves(Board board, int counter, int[] moves) {
+        return generateTargetMoves(board, board.ownKing(), board.enemyPieces(), KING_TABLE, KING_MASK, counter, moves);
+    }
+
+    private static int generateKnightAttackMoves(Board board, int counter, int[] moves) {
+        return generateTargetMoves(board, board.ownKnights(), board.enemyPieces(), KNIGHT_TABLE, KNIGHT, counter, moves);
+    }
+
+    private static int generatePawnAttackMoves(Board board, int counter, int[] moves) {
         long pawns = board.ownPawns();
         while (pawns != 0) {
             long pawn = lowestBit(pawns);
             int srcPos = lowestBitPosition(pawns);
             int promote = (pawn & RANK_7) != 0 ? MOVE_PROMO : 0;
-            long next = pawn << 8;//PAWN[pos];
-            if ((pieces & next) == 0) {
-                int tgtPos = lowestBitPosition(next);
-                counter = createPawnMove(moves, counter, srcPos, tgtPos, 0, promote);
-                if ((pawn & PAWN_RANK) != 0) {
-                    next <<= 8;
-                    tgtPos = lowestBitPosition(next);
-                    if ((pieces & next) == 0) {
-                        counter = createPawnMove(moves, counter, srcPos, tgtPos, 0, MOVE_EP);
-                    }
-                }
-            }
-            next = PAWN_ATTACK_TABLE[srcPos];
+            long next = PAWN_ATTACK_TABLE[srcPos] & board.enemyPieces();
             while (next != 0) {
-                long pawnAttack = lowestBit(next);
-                if ((pawnAttack & pieces) != 0 && board.enemy(pawnAttack)) {
-                    int tgtPos = lowestBitPosition(next);
-                    int capture = board.type(tgtPos, ROCK, SPECIAL);
-                    counter = createPawnMove(moves, counter, srcPos, tgtPos, capture, promote);
-                }
+                int tgtPos = lowestBitPosition(next);
+                int capture = board.type(tgtPos, ROCK, SPECIAL);
+                counter = createPawnMove(moves, counter, srcPos, tgtPos, capture, promote);
                 next = nextLowestBit(next);
             }
             pawns = nextLowestBit(pawns);
@@ -108,39 +117,69 @@ public class MoveGenerator {
         return counter;
     }
 
-    private static int generateRocksMoves(Board board, int counter, int[] moves) {
+    private static int generatePawnMoves(Board board, int counter, int[] moves) {
+        long pawns = board.ownPawns();
+        while (pawns != 0) {
+            long pawn = lowestBit(pawns);
+            int srcPos = lowestBitPosition(pawns);
+            int promote = (pawn & RANK_7) != 0 ? MOVE_PROMO : 0;
+            long next = pawn << 8;//PAWN[pos];
+            if ((board.pieces() & next) == 0) {
+                int tgtPos = lowestBitPosition(next);
+                counter = createPawnMove(moves, counter, srcPos, tgtPos, 0, promote);
+                if ((pawn & PAWN_RANK) != 0) {
+                    next <<= 8;
+                    tgtPos = lowestBitPosition(next);
+                    if ((board.pieces() & next) == 0) {
+                        counter = createPawnMove(moves, counter, srcPos, tgtPos, 0, MOVE_EP);
+                    }
+                }
+            }
+            next = PAWN_ATTACK_TABLE[srcPos] & (board.enemyPieces() | board.enPassant());
+            while (next != 0) {
+                int tgtPos = lowestBitPosition(next);
+                int capture = board.type(tgtPos, ROCK, SPECIAL);
+                counter = createPawnMove(moves, counter, srcPos, tgtPos, capture, promote);
+                next = nextLowestBit(next);
+            }
+            pawns = nextLowestBit(pawns);
+        }
+        return counter;
+    }
+
+    private static int generateRocksMoves(Board board, long filter, int counter, int[] moves) {
         long rocks = board.ownRocks();
         while (rocks != 0) {
             int pos = lowestBitPosition(rocks);
             long mask = generateLinearMoveFor(board, pos, ROCK_HIGH_TABLE, ROCK_LOW_TABLE);
-            counter = createMove(moves, counter, board, pos, ROCK, mask);
+            counter = createMove(moves, counter, board, pos, ROCK, mask & filter);
             rocks = nextLowestBit(rocks);
         }
         return counter;
     }
 
     private static int generateKnightMoves(Board board, int counter, int[] moves) {
-        return generateTargetMoves(board, board.ownKnights(), KNIGHT_TABLE, KNIGHT, counter, moves);
+        return generateTargetMoves(board, board.ownKnights(), ~board.ownPieces(), KNIGHT_TABLE, KNIGHT, counter, moves);
     }
 
-    private static int generateBishopsMoves(Board board, int counter, int[] moves) {
+    private static int generateBishopsMoves(Board board, long filter, int counter, int[] moves) {
         long bishops = board.ownBishops();
         while (bishops != 0) {
             int pos = lowestBitPosition(bishops);
             long mask = generateLinearMoveFor(board, pos, BISHOP_HIGH_TABLE, BISHOP_LOW_TABLE);
-            counter = createMove(moves, counter, board, pos, BISHOP, mask);
+            counter = createMove(moves, counter, board, pos, BISHOP, mask & filter);
             bishops = nextLowestBit(bishops);
         }
         return counter;
     }
 
-    private static int generateQueensMoves(Board board, int counter, int[] moves) {
+    private static int generateQueensMoves(Board board, long filter, int counter, int[] moves) {
         long queens = board.ownQueens();
         while (queens != 0) {
             int pos = lowestBitPosition(queens);
             long mask = generateLinearMoveFor(board, pos, ROCK_HIGH_TABLE, ROCK_LOW_TABLE)
                     | generateLinearMoveFor(board, pos, BISHOP_HIGH_TABLE, BISHOP_LOW_TABLE);
-            counter = createMove(moves, counter, board, pos, QUEEN, mask);
+            counter = createMove(moves, counter, board, pos, QUEEN, mask & filter);
             queens = nextLowestBit(queens);
         }
         return counter;
@@ -149,14 +188,14 @@ public class MoveGenerator {
     private static int generateKingMoves(Board board, int counter, int[] moves) {
         long king = board.ownKing();
         int kingPos = lowestBitPosition(king);
-        counter = generateTargetMoves(board, king, KING_TABLE, KING, counter, moves);
+        counter = generateTargetMoves(board, king, ~board.ownPieces(), KING_TABLE, KING_MASK, counter, moves);
         if (board.castleLow() && !isPositionInAttack(board, kingPos) && !isPositionInAttack(board, kingPos - 1)
                 && !isPositionInAttack(board, kingPos - 2)) {
-            moves[counter++] = createMove(kingPos, kingPos - 2, KING, 0, MOVE_CAST_L);
+            moves[counter++] = createMove(kingPos, kingPos - 2, KING_MASK, 0, MOVE_CAST_L);
         }
         if (board.castleHigh() && !isPositionInAttack(board, kingPos) && !isPositionInAttack(board, kingPos + 1)
                 && !isPositionInAttack(board, kingPos + 2)) {
-            moves[counter++] = createMove(kingPos, kingPos + 2, KING, 0, MOVE_CAST_H);
+            moves[counter++] = createMove(kingPos, kingPos + 2, KING_MASK, 0, MOVE_CAST_H);
         }
         return counter;
     }
@@ -191,11 +230,10 @@ public class MoveGenerator {
         return move;
     }
 
-    private static int generateTargetMoves(Board board, long pieces, long[] table, int srcType, int counter, int[] moves) {
-        long mask = ~board.ownPieces();
+    private static int generateTargetMoves(Board board, long pieces, long filter, long[] table, int srcType, int counter, int[] moves) {
         while (pieces != 0) {
             int srcPos = lowestBitPosition(pieces);
-            counter = createMove(moves, counter, board, srcPos, srcType, table[srcPos] & mask);
+            counter = createMove(moves, counter, board, srcPos, srcType, table[srcPos] & filter);
             pieces = nextLowestBit(pieces);
         }
         return counter;
@@ -227,10 +265,13 @@ public class MoveGenerator {
     }
 
     private static int createMove(int srcPos, int tgtPos, int srcType, int tgtType, int flags) {
-        return flags << 24 | tgtType << 20 | srcType << 16 | tgtPos << 8 | srcPos;
+        return flags << 24 | tgtType << 20 | (~srcType & 0xF) << 16 | tgtPos << 8 | srcPos;
     }
 
     public static boolean isPositionInAttack(Board board, int pos) {
+        if (pos == 64) {
+            System.out.println("HERE");
+        }
         long pieces = board.pieces();
         if ((PAWN_ATTACK_TABLE[pos] & board.enemyPawns()) != 0) return true;
         if ((KNIGHT_TABLE[pos] & board.enemyKnights()) != 0) return true;

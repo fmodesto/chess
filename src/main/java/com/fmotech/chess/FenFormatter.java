@@ -12,7 +12,8 @@ import static org.apache.commons.lang3.StringUtils.substring;
 public class FenFormatter {
 
     private static final int[] FROM_PROMO = createFromPromos();
-    private static final String[] TO_TILE = createToTiles();
+    private static final String[] TO_TILE_WHITE = createToTilesWhite();
+    private static final String[] TO_TILE_BLACK = createToTilesBlack();
     private static final String[] TO_PROMO = createToPromos();
 
     public static Board fromFen(String fen) {
@@ -46,11 +47,16 @@ public class FenFormatter {
             enPassant |= (1L << p) & (whiteTurn ? pawns << 8 : pawns >>> 8);
             if (whiteTurn) color |= enPassant;
         }
-        Board board = Board.of(color, pawns, rocks, knights, bishops, queens, kings, enPassant, castle);
+        int ply = 2 * (Integer.parseInt(parts[5]) - 1);
+        int fifty = ply - Integer.parseInt(parts[4]) + (whiteTurn ? 0 : 1);
+
+        Board board = Board.of(ply, fifty, color, pawns, rocks, knights, bishops, queens, kings, enPassant, castle);
         return whiteTurn ? board : board.nextTurn();
     }
 
     public static String toFen(Board board) {
+        String moves = " " + board.fifty() + " " + board.fullMove();
+
         boolean whiteTurn = board.whiteTurn();
         board = whiteTurn ? board : board.nextTurn();
 
@@ -95,8 +101,8 @@ public class FenFormatter {
         } else {
             sb.append("-");
         }
-        sb.append(" 0 1");
-        return sb.toString();
+
+        return sb.toString() + moves;
     }
 
     private static void fill(char[] board, long pieces, char character) {
@@ -113,23 +119,27 @@ public class FenFormatter {
     }
 
     public static String moveToFen(Board board, int move) {
-        int pos = board.whiteTurn() ? 0 : 63;
-        int src = abs(pos - (move & 0xFF));
-        int tgt = abs(pos - ((move >>> 8) & 0xFF));
+        int src = move & 0xFF;
+        int tgt = (move >>> 8) & 0xFF;
         int promo = (move >>> 24) & 0x07;
-        return TO_TILE[src] + TO_TILE[tgt] + TO_PROMO[promo];
+        if (board.whiteTurn())
+            return TO_TILE_WHITE[src] + TO_TILE_WHITE[tgt] + TO_PROMO[promo];
+        else
+            return TO_TILE_BLACK[src] + TO_TILE_BLACK[tgt] + TO_PROMO[promo];
     }
 
     public static int moveFromFen(Board board, String move) {
-        int pos = board.whiteTurn() ? 0 : 63;
-        int src = abs(pos - tile(substring(move, 0, 2)));
-        int tgt = abs(pos - tile(substring(move, 2, 4)));
+        int src = tile(board.whiteTurn(), substring(move, 0, 2));
+        int tgt = tile(board.whiteTurn(), substring(move, 2, 4));
         int promo = move.length() == 5 ? MOVE_PROMO | FROM_PROMO[move.charAt(4)] : 0;
         return promo << 24 | tgt << 8 | src;
     }
 
-    private static int tile(String tile) {
-        return 8 * (tile.charAt(1) - '1') + (7 - (tile.charAt(0) - 'a'));
+    private static int tile(boolean whiteTurn, String tile) {
+        if (whiteTurn)
+            return 8 * (tile.charAt(1) - '1') + (7 - (tile.charAt(0) - 'a'));
+        else
+            return 8 * (7 - (tile.charAt(1) - '1')) + (7 - (tile.charAt(0) - 'a'));
     }
 
     private static int[] createFromPromos() {
@@ -141,10 +151,18 @@ public class FenFormatter {
         return table;
     }
 
-    private static String[] createToTiles() {
+    private static String[] createToTilesWhite() {
         String[] table = new String[64];
         for (int i = 0; i < 64; i++) {
             table[i] = "" + (char) ((7 - i % 8) + 'a') + (char) ((i / 8) + '1');
+        }
+        return table;
+    }
+
+    private static String[] createToTilesBlack() {
+        String[] table = new String[64];
+        for (int i = 0; i < 64; i++) {
+            table[i] = "" + (char) ((7 - i % 8) + 'a') + (char) ((7 - i / 8) + '1');
         }
         return table;
     }
