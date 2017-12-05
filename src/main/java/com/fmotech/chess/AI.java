@@ -26,6 +26,7 @@ public class AI {
     private static final int MIN_VALUE = -32000;
     private static final int MAX_VALUE = 32000;
 
+    public static boolean SILENT = false;
     private final long timeout;
     private final int maxDepth;
     private int nodes;
@@ -60,7 +61,8 @@ public class AI {
                 time = System.currentTimeMillis() - time;
                 long data = table.get(board.hash());
                 move = move(data);
-                explainMove(board, score, depth, time);
+                if (!SILENT)
+                    explainMove(board, score, depth, time);
                 depth++;
                 if (MAX_VALUE - abs(score(data)) <= 512) {
                     break;
@@ -68,7 +70,8 @@ public class AI {
             }
         } catch (Timeout e) {
         }
-        System.out.println(board.ply() + " " + board);
+        if (!SILENT)
+            System.out.println(board.ply() + " " + board);
         return move;
     }
 
@@ -87,7 +90,6 @@ public class AI {
             System.out.print(moveToFen(board, move) + " ");
             board = board.move(move).nextTurn();
         }
-//        System.out.println();
         System.out.println("\t_ordering " + failHighFirst / max(1F, failHigh)
                 + " _pvs " + (1 - (failFoundPvCount / max(1F, foundPvCount)))
                 + " _table " + table.size());
