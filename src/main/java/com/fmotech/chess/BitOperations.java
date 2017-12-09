@@ -34,6 +34,14 @@ public class BitOperations {
         return Long.reverseBytes(n);
     }
 
+    public static long rotateLeft(long i, int distance) {
+        return Long.rotateLeft(i, distance);
+    }
+
+    public static long rotateRight(long i, int distance) {
+        return Long.rotateRight(i, distance);
+    }
+
     public static long joinInts(int high, int low) {
         return ((long) high << 32) | (low & 0xffffffffL);
     }

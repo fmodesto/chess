@@ -16,12 +16,9 @@ import java.util.stream.Collectors;
 
 import static com.fmotech.chess.FenFormatter.moveToFen;
 import static com.fmotech.chess.MoveGenerator.countMoves;
-import static java.lang.Long.parseLong;
 import static java.time.LocalDateTime.now;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 @RunWith(Parameterized.class)
 public class EpdTests {
@@ -43,7 +40,7 @@ public class EpdTests {
     @Test
     public void execute() {
         System.out.println(epd.board);
-        AI ai = new AI(30000, 32, epd.board, new long[2]);
+        AI ai = new AI(250, 32, epd.board, new long[2]);
         int bestMove = ai.think();
         List<Integer> expectedBest = EpdReader.getMoves(epd, "bm");
         ignoreFalse(moveToFen(epd.board, bestMove) + " in [" + EpdReader.getSan(epd, "bm") + "]", expectedBest.contains(bestMove));

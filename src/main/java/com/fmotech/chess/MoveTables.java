@@ -1,10 +1,11 @@
 package com.fmotech.chess;
 
-import static com.fmotech.chess.DebugUtils.*;
+import static com.fmotech.chess.DebugUtils.CHESS;
 
 public class MoveTables {
     public static final long[] PAWN_TABLE = computePawn();
-    public static final long[] PAWN_ATTACK_TABLE = computePawnAttack();
+    public static final long[] PAWN_ATTACK_HIGH_TABLE = computePawnAttackHigh();
+    public static final long[] PAWN_ATTACK_LOW_TABLE = computePawnAttackLow();
 
     public static final long[] ROCK_HIGH_TABLE = computeRockHigh();
     public static final long[] ROCK_LOW_TABLE = computeRockLow();
@@ -15,6 +16,25 @@ public class MoveTables {
     public static final long[] KNIGHT_TABLE = computeKnight();
 
     public static final long[] KING_TABLE = computeKing();
+
+    public static final long[] DIR3_TABLE = computeDir(0b100);
+    public static final long[] DIR2_TABLE = computeDir(0b010);
+    public static final long[] DIR1_TABLE = computeDir(0b001);
+
+    private static final long NOT_A_FILE = 0x7F7F7F7F7F7F7F7FL;
+    private static final long NOT_H_FILE = 0xFEFEFEFEFEFEFEFEL;
+
+    private static long[] computeDir(int bit) {
+        long[] table = new long[64];
+        for (int i = 0; i < table.length; i++) {
+            long slider = 1L << i;
+            for (int j = 0; j < 8; j++) {
+                if ((j & bit) != 0)
+                    table[i] |= MoveGenerator.slidingAttacks(slider, -1, j);
+            }
+        }
+        return table;
+    }
 
     public static void main(String[] args) {
         for (int i = 0; i < 64; i++) {
@@ -31,7 +51,7 @@ public class MoveTables {
         return positions;
     }
 
-    private static long[] computePawnAttack() {
+    private static long[] computePawnAttackHigh() {
         long leftMask = ~computeRight();
         long rightMask = ~computeLeft();
         long[] positions = new long[64];
@@ -40,6 +60,25 @@ public class MoveTables {
             long board = 0;
             board |= p << 7;
             board |= p << 9;
+            if (i % 8 == 7) {
+                board &= leftMask;
+            } else if (i % 8 == 0) {
+                board &= rightMask;
+            }
+            positions[i] = board;
+        }
+        return positions;
+    }
+
+    private static long[] computePawnAttackLow() {
+        long leftMask = ~computeRight();
+        long rightMask = ~computeLeft();
+        long[] positions = new long[64];
+        for (int i = 0; i < 64; i++) {
+            long p = 1L << i;
+            long board = 0;
+            board |= p >>> 7;
+            board |= p >>> 9;
             if (i % 8 == 7) {
                 board &= leftMask;
             } else if (i % 8 == 0) {

@@ -83,8 +83,7 @@ public class MoveGeneratorTest {
 
     public static void assertHasMove(int move, int[] moves, int counter) {
         for (int i = 0; i < counter; i++) {
-            int clean = moves[i] & 0x0F00FFFF;
-            if (move == clean) return;
+            if (move == moves[i]) return;
         }
         fail("Move not found: " + leftPad(Integer.toHexString(move), 8, '0'));
     }

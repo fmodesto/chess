@@ -2,7 +2,6 @@ package com.fmotech.chess;
 
 import org.junit.Test;
 
-import static com.fmotech.chess.DebugUtils.CHESS;
 import static com.fmotech.chess.DebugUtils.createBlackBoard;
 import static com.fmotech.chess.DebugUtils.createWhiteBoard;
 import static org.junit.Assert.assertEquals;

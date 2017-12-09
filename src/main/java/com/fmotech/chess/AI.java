@@ -2,6 +2,7 @@ package com.fmotech.chess;
 
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 
+import static com.fmotech.chess.Evaluation.evaluateBoardPosition;
 import static com.fmotech.chess.FenFormatter.moveToFen;
 import static com.fmotech.chess.MoveGenerator.isInCheck;
 import static com.fmotech.chess.PvData.ALPHA;
@@ -16,7 +17,6 @@ import static com.fmotech.chess.PvData.move;
 import static com.fmotech.chess.PvData.score;
 import static com.fmotech.chess.PvData.scoreType;
 import static com.fmotech.chess.PvData.status;
-import static com.fmotech.chess.Evaluation.evaluateBoardPosition;
 import static java.lang.Float.max;
 import static java.lang.Integer.signum;
 import static java.lang.Math.abs;

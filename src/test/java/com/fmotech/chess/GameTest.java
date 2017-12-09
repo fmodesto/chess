@@ -2,8 +2,6 @@ package com.fmotech.chess;
 
 import org.junit.Test;
 
-import static org.junit.Assert.*;
-
 public class GameTest {
 
     @Test

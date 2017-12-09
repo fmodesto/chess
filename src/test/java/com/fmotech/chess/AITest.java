@@ -3,9 +3,6 @@ package com.fmotech.chess;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import static com.fmotech.chess.FenFormatter.fromFen;
-import static org.junit.Assert.*;
-
 public class AITest {
 
     @Test

@@ -1,13 +1,10 @@
 package com.fmotech.chess;
 
-import static com.fmotech.chess.BitOperations.bitCount;
 import static com.fmotech.chess.BitOperations.fileFill;
 import static com.fmotech.chess.BitOperations.lowestBit;
 import static com.fmotech.chess.BitOperations.lowestBitPosition;
 import static com.fmotech.chess.BitOperations.nextLowestBit;
 import static com.fmotech.chess.BitOperations.reverse;
-import static com.fmotech.chess.DebugUtils.CHESS;
-import static com.fmotech.chess.DebugUtils.FEN;
 
 public class Evaluation {
 

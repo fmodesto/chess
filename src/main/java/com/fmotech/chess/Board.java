@@ -1,12 +1,9 @@
 package com.fmotech.chess;
 
 import java.util.Arrays;
-import java.util.Random;
 
 import static com.fmotech.chess.BitOperations.highInt;
 import static com.fmotech.chess.BitOperations.lowInt;
-import static com.fmotech.chess.BitOperations.lowestBitPosition;
-import static com.fmotech.chess.BitOperations.nextLowestBit;
 import static com.fmotech.chess.BitOperations.reverse;
 
 public class Board {
@@ -27,12 +24,6 @@ public class Board {
     public static final int PAWN = 0b001;
 
     public static final int SPECIAL = 0b111;
-
-    public static final int MOVE_CAST_H = 0x80;
-    public static final int MOVE_CAST_L = 0x40;
-    public static final int MOVE_EP_CAP = 0x20;
-    public static final int MOVE_EP = 0x10;
-    public static final int MOVE_PROMO = 0x08;
 
     private static final long HASH1_BITS = 0xDEADBEEFDEADBEEFL;
     private static final long HASH2_BITS = 0x9E3779B97F4A7C13L;
@@ -194,10 +185,6 @@ public class Board {
         return (piece & b4) != 0;
     }
 
-    public long pieces() {
-        return (b3 | b2 | b1) & ~enPassant();
-    }
-
     public long enPassant() {
         return b3 & b2 & b1 & EN_PASSANT;
     }
@@ -217,6 +204,43 @@ public class Board {
     public int type(int pos, int castle, int enPassant) {
         int type = (int) (((b3 >>> pos) & 1) << 2 | ((b2 >>> pos) & 1) << 1 | ((b1 >>> pos) & 1));
         return type != SPECIAL ? type : ((1 << pos) & CASTLE) != 0 ? castle : enPassant;
+    }
+
+    public int type(long bit) {
+        int type = (b3 & bit) != 0 ? 0b100 : 0;
+        type |= (b2 & ~(b1 & b3) & bit) != 0 ? 0b010 : 0;
+        type |= (b1 & bit) != 0 ? 0b001 : 0;
+        return type;
+    }
+
+    // Pieces
+
+    public long pieces() {
+        return (b3 | b2 | b1) & ~enPassant();
+    }
+
+    public long pawns() {
+        return ~b3 & ~b2 & b1;
+    }
+
+    public long rocks() {
+        return b3 & (~b2 | CASTLE) & b1;
+    }
+
+    public long knights() {
+        return ~b3 & b2 & ~b1;
+    }
+
+    public long bishops() {
+        return ~b3 & b2 & b1;
+    }
+
+    public long queens() {
+        return b3 & b2 & ~b1;
+    }
+
+    public long kings() {
+        return b3 & ~b2 & ~b1;
     }
 
     // Own pieces

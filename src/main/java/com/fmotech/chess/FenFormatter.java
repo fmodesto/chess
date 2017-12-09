@@ -4,8 +4,12 @@ import java.util.Arrays;
 
 import static com.fmotech.chess.BitOperations.lowestBitPosition;
 import static com.fmotech.chess.BitOperations.nextLowestBit;
-import static com.fmotech.chess.Board.MOVE_PROMO;
-import static java.lang.Math.abs;
+import static com.fmotech.chess.Board.KING;
+import static com.fmotech.chess.Board.PAWN;
+import static com.fmotech.chess.Board.ROCK;
+import static com.fmotech.chess.Board.SPECIAL;
+import static com.fmotech.chess.Move.MOVE_EP_CAP;
+import static com.fmotech.chess.Move.MOVE_PROMO;
 import static org.apache.commons.lang3.StringUtils.normalizeSpace;
 import static org.apache.commons.lang3.StringUtils.substring;
 
@@ -131,8 +135,21 @@ public class FenFormatter {
     public static int moveFromFen(Board board, String move) {
         int src = tile(board.whiteTurn(), substring(move, 0, 2));
         int tgt = tile(board.whiteTurn(), substring(move, 2, 4));
-        int promo = move.length() == 5 ? MOVE_PROMO | FROM_PROMO[move.charAt(4)] : 0;
-        return promo << 24 | tgt << 8 | src;
+        int flags = move.length() == 5 ? MOVE_PROMO | FROM_PROMO[move.charAt(4)] : 0;
+        int srcType = board.type(src, ROCK, 0);
+        int tgtType = board.type(tgt, ROCK, srcType == PAWN ? SPECIAL : 0);
+        if (srcType == PAWN && tgtType == SPECIAL) {
+            if ((flags & MOVE_PROMO) != 0) {
+                tgtType = ROCK;
+            } else {
+                tgtType = PAWN;
+                flags |= MOVE_EP_CAP;
+            }
+        }
+        if (srcType == PAWN && tgt == srcType + 16) flags |= Move.MOVE_EP;
+        if (srcType == KING && src == tgt + 2) flags |= Move.MOVE_CAST_L;
+        if (srcType == KING && src + 2 == tgt) flags |= Move.MOVE_CAST_H;
+        return Move.create(src, tgt, srcType, tgtType, flags);
     }
 
     private static int tile(boolean whiteTurn, String tile) {

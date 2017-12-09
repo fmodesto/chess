@@ -6,23 +6,27 @@ import static com.fmotech.chess.BitOperations.lowestBit;
 import static com.fmotech.chess.BitOperations.lowestBitPosition;
 import static com.fmotech.chess.BitOperations.nextHighestBit;
 import static com.fmotech.chess.BitOperations.nextLowestBit;
+import static com.fmotech.chess.BitOperations.rotateLeft;
 import static com.fmotech.chess.Board.BISHOP;
 import static com.fmotech.chess.Board.KING;
 import static com.fmotech.chess.Board.KNIGHT;
-import static com.fmotech.chess.Board.MOVE_CAST_H;
-import static com.fmotech.chess.Board.MOVE_CAST_L;
-import static com.fmotech.chess.Board.MOVE_EP;
-import static com.fmotech.chess.Board.MOVE_EP_CAP;
-import static com.fmotech.chess.Board.MOVE_PROMO;
 import static com.fmotech.chess.Board.PAWN;
 import static com.fmotech.chess.Board.QUEEN;
 import static com.fmotech.chess.Board.ROCK;
 import static com.fmotech.chess.Board.SPECIAL;
+import static com.fmotech.chess.Move.MOVE_CAST_H;
+import static com.fmotech.chess.Move.MOVE_CAST_L;
+import static com.fmotech.chess.Move.MOVE_EP;
+import static com.fmotech.chess.Move.MOVE_EP_CAP;
+import static com.fmotech.chess.Move.MOVE_PROMO;
 import static com.fmotech.chess.MoveTables.BISHOP_HIGH_TABLE;
 import static com.fmotech.chess.MoveTables.BISHOP_LOW_TABLE;
+import static com.fmotech.chess.MoveTables.DIR1_TABLE;
+import static com.fmotech.chess.MoveTables.DIR2_TABLE;
+import static com.fmotech.chess.MoveTables.DIR3_TABLE;
 import static com.fmotech.chess.MoveTables.KING_TABLE;
 import static com.fmotech.chess.MoveTables.KNIGHT_TABLE;
-import static com.fmotech.chess.MoveTables.PAWN_ATTACK_TABLE;
+import static com.fmotech.chess.MoveTables.PAWN_ATTACK_HIGH_TABLE;
 import static com.fmotech.chess.MoveTables.ROCK_HIGH_TABLE;
 import static com.fmotech.chess.MoveTables.ROCK_LOW_TABLE;
 
@@ -32,6 +36,17 @@ public class MoveGenerator {
     private static final long RANK_7 = 0x00FF0000_00000000L;
     private static final long NONE = -1L;
     private static final int KING_MASK = 0x8 | KING;
+
+    private static int[] SHIFT = { -7, -1, -9, -8, 7, 1, 9, 8 };
+    private static long[] AVOID_WRAP = {
+            0x00fefefefefefefeL,
+            0x7f7f7f7f7f7f7f7fL,
+            0x007f7f7f7f7f7f7fL,
+            0x00ffffffffffffffL,
+            0x7f7f7f7f7f7f7f00L,
+            0xfefefefefefefefeL,
+            0xfefefefefefefe00L,
+            0xffffffffffffff00L };
 
     public static long countMoves(int level, Board board) {
         if (level == 0) return 1;
@@ -105,7 +120,7 @@ public class MoveGenerator {
             long pawn = lowestBit(pawns);
             int srcPos = lowestBitPosition(pawns);
             int promote = (pawn & RANK_7) != 0 ? MOVE_PROMO : 0;
-            long next = PAWN_ATTACK_TABLE[srcPos] & board.enemyPieces();
+            long next = PAWN_ATTACK_HIGH_TABLE[srcPos] & board.enemyPieces();
             while (next != 0) {
                 int tgtPos = lowestBitPosition(next);
                 int capture = board.type(tgtPos, ROCK, SPECIAL);
@@ -135,7 +150,7 @@ public class MoveGenerator {
                     }
                 }
             }
-            next = PAWN_ATTACK_TABLE[srcPos] & (board.enemyPieces() | board.enPassant());
+            next = PAWN_ATTACK_HIGH_TABLE[srcPos] & (board.enemyPieces() | board.enPassant());
             while (next != 0) {
                 int tgtPos = lowestBitPosition(next);
                 int capture = board.type(tgtPos, ROCK, SPECIAL);
@@ -191,11 +206,11 @@ public class MoveGenerator {
         counter = generateTargetMoves(board, king, ~board.ownPieces(), KING_TABLE, KING_MASK, counter, moves);
         if (board.castleLow() && !isPositionInAttack(board, kingPos) && !isPositionInAttack(board, kingPos - 1)
                 && !isPositionInAttack(board, kingPos - 2)) {
-            moves[counter++] = createMove(kingPos, kingPos - 2, KING_MASK, 0, MOVE_CAST_L);
+            moves[counter++] = Move.create(kingPos, kingPos - 2, KING_MASK, 0, MOVE_CAST_L);
         }
         if (board.castleHigh() && !isPositionInAttack(board, kingPos) && !isPositionInAttack(board, kingPos + 1)
                 && !isPositionInAttack(board, kingPos + 2)) {
-            moves[counter++] = createMove(kingPos, kingPos + 2, KING_MASK, 0, MOVE_CAST_H);
+            moves[counter++] = Move.create(kingPos, kingPos + 2, KING_MASK, 0, MOVE_CAST_H);
         }
         return counter;
     }
@@ -241,14 +256,14 @@ public class MoveGenerator {
 
     private static int createPawnMove(int[] moves, int counter, int srcPos, int tgtPos, int tgtType, int flags) {
         if (flags == MOVE_PROMO) {
-            moves[counter++] = createMove(srcPos, tgtPos, PAWN, tgtType, MOVE_PROMO | QUEEN);
-            moves[counter++] = createMove(srcPos, tgtPos, PAWN, tgtType, MOVE_PROMO | ROCK);
-            moves[counter++] = createMove(srcPos, tgtPos, PAWN, tgtType, MOVE_PROMO | BISHOP);
-            moves[counter++] = createMove(srcPos, tgtPos, PAWN, tgtType, MOVE_PROMO | KNIGHT);
+            moves[counter++] = Move.create(srcPos, tgtPos, PAWN, tgtType, MOVE_PROMO | QUEEN);
+            moves[counter++] = Move.create(srcPos, tgtPos, PAWN, tgtType, MOVE_PROMO | ROCK);
+            moves[counter++] = Move.create(srcPos, tgtPos, PAWN, tgtType, MOVE_PROMO | BISHOP);
+            moves[counter++] = Move.create(srcPos, tgtPos, PAWN, tgtType, MOVE_PROMO | KNIGHT);
         } else if (tgtType == SPECIAL) {
-            moves[counter++] = createMove(srcPos, tgtPos, PAWN, PAWN, MOVE_EP_CAP);
+            moves[counter++] = Move.create(srcPos, tgtPos, PAWN, PAWN, MOVE_EP_CAP);
         } else {
-            moves[counter++] = createMove(srcPos, tgtPos, PAWN, tgtType, flags);
+            moves[counter++] = Move.create(srcPos, tgtPos, PAWN, tgtType, flags);
         }
         return counter;
     }
@@ -258,14 +273,10 @@ public class MoveGenerator {
         while (next != 0) {
             int tgtPos = lowestBitPosition(next);
             int tgtType = board.type(tgtPos, ROCK, 0);
-            moves[counter++] = createMove(srcPos, tgtPos, srcType, tgtType, 0);
+            moves[counter++] = Move.create(srcPos, tgtPos, srcType, tgtType, 0);
             next = nextLowestBit(next);
         }
         return counter;
-    }
-
-    private static int createMove(int srcPos, int tgtPos, int srcType, int tgtType, int flags) {
-        return flags << 24 | tgtType << 20 | (~srcType & 0xF) << 16 | tgtPos << 8 | srcPos;
     }
 
     public static boolean isPositionInAttack(Board board, int pos) {
@@ -273,7 +284,7 @@ public class MoveGenerator {
             System.out.println("HERE");
         }
         long pieces = board.pieces();
-        if ((PAWN_ATTACK_TABLE[pos] & board.enemyPawns()) != 0) return true;
+        if ((PAWN_ATTACK_HIGH_TABLE[pos] & board.enemyPawns()) != 0) return true;
         if ((KNIGHT_TABLE[pos] & board.enemyKnights()) != 0) return true;
         if ((KING_TABLE[pos] & board.enemyKing()) != 0) return true;
         long rocksQueens = board.enemyRocks() | board.enemyQueens();
@@ -309,5 +320,34 @@ public class MoveGenerator {
             }
         }
         return false;
+    }
+
+    public static int slidingDirection(int pos, long prev) {
+        int dir8 = 0;
+        dir8 |= (DIR3_TABLE[pos] & prev) != 0 ? 0b100 : 0;
+        dir8 |= (DIR2_TABLE[pos] & prev) != 0 ? 0b010 : 0;
+        dir8 |= (DIR1_TABLE[pos] & prev) != 0 ? 0b001 : 0;
+        return dir8;
+    }
+
+    public static long slidingAttacks(long slider, long empty, int dir8) {
+        long fill = occludedFill(slider, empty, dir8);
+        return shiftOne(fill, dir8);
+    }
+
+    private static long occludedFill(long gen, long pro, int dir8) {
+        int r = SHIFT[dir8]; // {+-1,7,8,9}
+        pro &= AVOID_WRAP[dir8];
+        gen |= pro & rotateLeft(gen, r);
+        pro &= rotateLeft(pro, r);
+        gen |= pro & rotateLeft(gen, 2 * r);
+        pro &= rotateLeft(pro, 2 * r);
+        gen |= pro & rotateLeft(gen, 4 * r);
+        return gen;
+    }
+
+    private static long shiftOne(long b, int dir8) {
+        int r = SHIFT[dir8]; // {+-1,7,8,9}
+        return rotateLeft(b, r) & AVOID_WRAP[dir8];
     }
 }

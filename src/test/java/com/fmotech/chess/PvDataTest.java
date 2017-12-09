@@ -6,7 +6,7 @@ import static com.fmotech.chess.PvData.ALPHA;
 import static com.fmotech.chess.PvData.BETA;
 import static com.fmotech.chess.PvData.EXACT;
 import static com.fmotech.chess.PvData.OPEN;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class PvDataTest {
 

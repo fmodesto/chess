@@ -2,7 +2,6 @@ package com.fmotech.chess;
 
 import org.junit.Test;
 
-import static com.fmotech.chess.DebugUtils.FEN;
 import static com.fmotech.chess.Evaluation.evaluateBoardPosition;
 import static com.fmotech.chess.FenFormatter.moveFromFen;
 import static org.junit.Assert.assertEquals;

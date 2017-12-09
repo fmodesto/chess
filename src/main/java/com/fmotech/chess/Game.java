@@ -20,7 +20,7 @@ public class Game {
     public static void main(String[] args) {
         AI.SILENT = true;
         Game game = new Game();
-        game.autoPly(100, 64);
+        game.autoPly(1000, 64);
     }
 
     public static Game load(String pgn) {
