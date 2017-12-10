@@ -2,8 +2,11 @@ package com.fmotech.chess;
 
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 
+import java.util.Arrays;
+
 import static com.fmotech.chess.Evaluation.evaluateBoardPosition;
 import static com.fmotech.chess.FenFormatter.moveToFen;
+import static com.fmotech.chess.Move.scoreMvvLva;
 import static com.fmotech.chess.MoveGenerator.isInCheck;
 import static com.fmotech.chess.PvData.ALPHA;
 import static com.fmotech.chess.PvData.BETA;
@@ -39,6 +42,8 @@ public class AI {
     private int foundPvCount = 0;
     private final Board board;
 
+    public static long nodesNegamaxTotal = 0;
+    public static long nodesQuiescenceTotal = 0;
     public AI(int millis, int maxDepth, Board board, long[] hashes) {
         this.timeout = System.currentTimeMillis() + (millis <= 0 ? Integer.MAX_VALUE : millis);
         this.maxDepth = maxDepth;
@@ -96,6 +101,7 @@ public class AI {
     }
 
     private int negaMax(int depth, Board board, int alpha, int beta) {
+        nodesNegamaxTotal++;
         long hash = board.hash();
         long data = table.get(hash);
 
@@ -111,11 +117,13 @@ public class AI {
                 return alpha;
             if (scoreType(data) != ALPHA && score(data) >= beta)
                 return beta;
+            if (scoreType(data) == EXACT)
+                return score(data);
         }
 
         if (ply == depth) {
             alpha = /*isChecked(board) ? beta :*/ quiescentSearch(board, alpha, beta);
-            recordPv(hash, CLOSE, ply, 0, alpha, move(data), initAlpha, beta);
+            recordPv(true, hash, CLOSE, ply, 0, alpha, move(data), initAlpha, beta);
             return alpha;
         }
 
@@ -126,15 +134,11 @@ public class AI {
         int[] moves = board.moves();
         int c = MoveGenerator.generateDirtyMoves(board, moves);
         int validMoves = 0;
-        boolean followPv = sortMoves(c, moves, move(table.get(hash)));
+        sortMoves(c, moves, move(table.get(hash)));
         boolean foundPv = false;
         int bestMove = 0;
 
         for (int i = 0; i < c; i++) {
-            if (!followPv)
-                sortMoves(i, c, moves);
-            followPv = false;
-
             Board next = board.move(moves[i]);
             if (!MoveGenerator.isValid(next))
                 continue;
@@ -165,23 +169,29 @@ public class AI {
             }
         }
 
-        if (validMoves == 0)
+        if (validMoves == 0) {
             alpha = isInCheck(board) ? MIN_VALUE + ply : 0;
+            table.put(hash, create(status | EXACT, ply, depth - ply, alpha, 0));
+            return alpha;
+        }
 
-        recordPv(hash, status, ply, depth - ply, alpha, bestMove, initAlpha, beta);
+        recordPv(false, hash, status, ply, depth - ply, alpha, bestMove, initAlpha, beta);
         return alpha;
     }
 
-    private void recordPv(long hash, long status, int ply, int depth, int score, int move, int alpha, int beta) {
-        if (score == alpha)
+    private void recordPv(boolean quiescent, long hash, long status, int ply, int depth, int score, int move, int alpha, int beta) {
+        if (score == alpha) {
             table.put(hash, create(status | ALPHA, ply, depth, score, move));
-        else if (score == beta)
+        } else if (score == beta) {
+            if (!quiescent) System.out.println("no entiendo na!");
             table.put(hash, create(status | BETA, ply, depth, score, move));
-        else
+        } else {
             table.put(hash, create(status | EXACT, ply, depth, score, move));
+        }
     }
 
     private int quiescentSearch(Board board, int alpha, int beta) {
+        nodesQuiescenceTotal++;
         maintenance();
 
         if (board.fifty() >= 100 || status(table.get(board.hash())) == OPEN)
@@ -198,8 +208,10 @@ public class AI {
         int c = MoveGenerator.generateDirtyCaptureMoves(board, moves);
         int validMoves = 0;
 
+        sortMoves(c, moves, 0);
         for (int i = 0; i < c; i++) {
-            sortMoves(i, c, moves);
+            if (Move.evalCapture(moves[i]) < 0 && See.see(board, moves[i]) < 0)
+                continue;
 
             Board next = board.move(moves[i]);
             if (!MoveGenerator.isValid(next))
@@ -226,30 +238,20 @@ public class AI {
             checkTime();
     }
 
-    private void sortMoves(int from, int to, int[] moves) {
-        int index = from;
-        int best = (moves[from] >>> 16) & 0xFF;
-        for (int i = from + 1; i < to; i++) {
-            if (((moves[i] >>> 16) & 0xFF) > best) {
-                best = (moves[i] >>> 16) & 0xFF;
-                index = i;
-            }
-        }
-
-        int t = moves[from];
-        moves[from] = moves[index];
-        moves[index] = t;
-    }
-
-    private boolean sortMoves(int size, int[] moves, int pv) {
-        if (pv == 0) return false;
+    static long[] scoredMoves = new long[256];
+    private void sortMoves(int size, int[] moves, int pv) {
         for (int i = 0; i < size; i++) {
-            if (moves[i] == pv) {
-                moves[i] = moves[0];
-                moves[0] = pv;
-            }
+            int score;
+            if (moves[i] == pv)
+                score = -1000000;
+            else
+                score = -scoreMvvLva(moves[i]);
+            scoredMoves[i] = BitOperations.joinInts(score, moves[i]);
         }
-        return moves[0] == pv;
+        Arrays.sort(scoredMoves, 0, size);
+        for (int i = 0; i < size; i++) {
+            moves[i] = BitOperations.lowInt(scoredMoves[i]);
+        }
     }
 
     private void checkTime() {

@@ -37,11 +37,12 @@ public class EpdReader {
                 .collect(toList());
     }
 
-    public static String getSan(Epd epd, String type) {
+    public static String getFen(Epd epd, String type) {
         return epd.actions.stream()
                 .filter(e -> type.equals(e.action))
                 .flatMap(e -> Arrays.stream(StringUtils.split(e.parameter, " ")))
-                .collect(joining(", "));
+                .map(e -> FenFormatter.moveToFen(epd.board, SanFormatter.moveFromSan(epd.board, e)))
+                .collect(joining(","));
     }
 
     public static class Action {

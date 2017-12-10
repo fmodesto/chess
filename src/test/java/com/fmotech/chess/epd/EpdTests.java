@@ -40,12 +40,18 @@ public class EpdTests {
     @Test
     public void execute() {
         System.out.println(epd.board);
-        AI ai = new AI(250, 32, epd.board, new long[2]);
+        String bm = EpdReader.getFen(epd, "bm");
+        String am = EpdReader.getFen(epd, "am");
+        if (bm.length() > 0)
+            System.out.println("Best moves: " + bm);
+        if (am.length() > 0)
+            System.out.println("Avoid moves: " + am);
+        AI ai = new AI(30000, 32, epd.board, new long[2]);
         int bestMove = ai.think();
         List<Integer> expectedBest = EpdReader.getMoves(epd, "bm");
-        ignoreFalse(moveToFen(epd.board, bestMove) + " in [" + EpdReader.getSan(epd, "bm") + "]", expectedBest.contains(bestMove));
+        ignoreFalse(moveToFen(epd.board, bestMove) + " in [" + bm + "]", expectedBest.isEmpty() || expectedBest.contains(bestMove));
         List<Integer> expectedBad = EpdReader.getMoves(epd, "am");
-        ignoreTrue(moveToFen(epd.board, bestMove) + " not in [" + EpdReader.getSan(epd, "am") + "]", expectedBad.contains(bestMove));
+        ignoreTrue(moveToFen(epd.board, bestMove) + " not in [" + am + "]", expectedBad.contains(bestMove));
     }
 
     private void ignoreFalse(String message, boolean condition) {

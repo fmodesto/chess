@@ -32,10 +32,10 @@ import static com.fmotech.chess.MoveTables.ROCK_LOW_TABLE;
 
 public class MoveGenerator {
 
+    public static final int KING_MASK = 0x8 | KING;
     private static final long PAWN_RANK = 0x000000000000ff00L;
     private static final long RANK_7 = 0x00FF0000_00000000L;
     private static final long NONE = -1L;
-    private static final int KING_MASK = 0x8 | KING;
 
     private static int[] SHIFT = { -7, -1, -9, -8, 7, 1, 9, 8 };
     private static long[] AVOID_WRAP = {

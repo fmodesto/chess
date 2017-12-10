@@ -35,9 +35,6 @@ public class See {
         gain[depth] = hasFlag(move, MOVE_EP_CAP) ? value[PAWN] : value[board.type(tgt)];
         int type = srcType(move);
 
-        if (gain[depth] > value[type])
-            return gain[depth] - value[type];
-
         long attackers = attackersTo(board, tgt, tgtPos, pieces);
         long color = board.ownPieces();
 
