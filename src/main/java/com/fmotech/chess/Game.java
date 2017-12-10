@@ -20,7 +20,6 @@ public class Game {
     private Pattern FEN = Pattern.compile("[a-h][1-8][a-h][1-8]");
 
     public static void main(String[] args) {
-        AI.SILENT = true;
         Game game = new Game();
 //        game.autoPly(-1, 7);
 //        Game copy = Game.load(
@@ -47,8 +46,8 @@ public class Game {
                 "73. d7d1 e2d1 74. g1h1 e3e2 75. h1g1 e2e1q 76. g1h2 f8g8 77. h2h3 e1g3");
         System.out.println("\n");
         long initTime = System.currentTimeMillis();
-//        game.autoPly(-1, 7);
-        game.followPly(-1, 7, copy);
+        game.autoPly(60000, 64);
+//        game.followPly(-1, 7, copy);
         double time = (System.currentTimeMillis() - initTime) / 1000D;
         System.out.println(AI.nodesNegamaxTotal + " nps " + (AI.nodesNegamaxTotal / time));
         System.out.println(AI.nodesQuiescenceTotal + " nps " + (AI.nodesQuiescenceTotal / time));
@@ -134,15 +133,15 @@ public class Game {
     public String result() {
         if (MoveGenerator.generateValidMoves(board, board.moves()) == 0) {
             if (isInCheck(board))
-                return (board.whiteTurn() ? "0-1 {black" : "1-0 {white") + " mates (claimed by Cheesy)}";
+                return (board.whiteTurn() ? "0-1 {black" : "1-0 {white") + " mates (claimed by Chessy)}";
             else
-                return "1/2-1/2 {stalemate (claimed by Cheesy)}";
+                return "1/2-1/2 {stalemate (claimed by Chessy)}";
         } else if (board.fifty() >= 100) {
-            return "1/2-1/2 {fifty move rule (claimed by Cheesy)}";
+            return "1/2-1/2 {fifty move rule (claimed by Chessy)}";
         } else if (countRepetitions() >= 3) {
-            return "1/2-1/2 {3-fold repetition (claimed by Cheesy)}";
+            return "1/2-1/2 {3-fold repetition (claimed by Chessy)}";
         } else if (isDrawMaterial()) {
-            return "1/2-1/2 {insufficient material (claimed by Cheesy)}";
+            return "1/2-1/2 {insufficient material (claimed by Chessy)}";
         }
         return "* {game in progress}";
     }

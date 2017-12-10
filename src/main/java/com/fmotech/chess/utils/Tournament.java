@@ -1,6 +1,5 @@
 package com.fmotech.chess.utils;
 
-import com.fmotech.chess.AI;
 import com.fmotech.chess.Game;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
@@ -11,27 +10,38 @@ import java.util.List;
 import java.util.Scanner;
 
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.lang3.StringUtils.defaultString;
 import static org.apache.commons.lang3.StringUtils.split;
 import static org.apache.commons.lang3.StringUtils.substringAfter;
+import static org.apache.commons.lang3.StringUtils.substringAfterLast;
 import static org.apache.commons.lang3.StringUtils.substringBefore;
 import static org.apache.commons.lang3.StringUtils.trim;
 
 public class Tournament {
 
     public static void main(String[] args) throws Exception {
-        AI.SILENT = true;
-        for (int i = 1; i <= 5; i++) {
-            int time = i;
-            loadGame().forEach(e -> {
-                try {
-                    playVice(true, time, e.left, e.right);
-                    playVice(false, time, e.left, e.right);
-                    playTscp(true, time, e.left, e.right);
-                    playTscp(false, time, e.left, e.right);
-                } catch (Exception ex) {}
-            });
-            }
+        if (args.length < 3) {
+            System.out.println("chessy <protocol> <seconds move> <rival>");
+            return;
         }
+
+        boolean uci = "uci".equals(args[0]);
+        int time = Integer.parseInt(args[1]);
+        String program = args[2];
+
+        loadGame().forEach(e -> {
+            try {
+                if (uci) {
+                    playUci(program, true, time, e.left, e.right);
+                    playUci(program, false, time, e.left, e.right);
+                }
+                else {
+                    playXboard(program, true, time, e.left, e.right);
+                    playXboard(program, false, time, e.left, e.right);
+                }
+            } catch (Exception ex) {}
+        });
+    }
 
     private static List<ImmutablePair<String, String[]>> loadGame() throws Exception {
         return new BufferedReader(new InputStreamReader(Tournament.class.getResourceAsStream("/silversuite.pgn")))
@@ -41,9 +51,10 @@ public class Tournament {
                 .collect(toList());
     }
 
-    public static int playVice(boolean whiteTurn, int time, String opening, String[] moves) throws Exception {
+    public static int playUci(String program, boolean whiteTurn, int time, String opening, String[] moves) throws Exception {
         Game game = new Game();
-        Process engine = Runtime.getRuntime().exec(new String[] { "/Users/fran/Projects/vice/Ch81/vice" });
+        String name = defaultString(substringAfterLast(program, "/"), program);
+        Process engine = Runtime.getRuntime().exec(new String[] { program });
         Scanner engineIn = new Scanner(engine.getInputStream());
         PrintWriter engineOut = new PrintWriter(engine.getOutputStream());
         send(engineOut, "uci");
@@ -54,11 +65,11 @@ public class Tournament {
         System.out.println("[Opening \"" + opening + "\"]");
         System.out.println("[Movetime \"" + time + "\"]");
         if (!whiteTurn) {
-            System.out.println("[White \"vice\"]");
+            System.out.println("[White \"" + name + "\"]");
             System.out.println("[Black \"chessy\"]");
         } else {
             System.out.println("[White \"chessy\"]");
-            System.out.println("[Black \"vice\"]");
+            System.out.println("[Black \"" + name + "\"]");
         }
 
         for (String move : moves)
@@ -89,9 +100,10 @@ public class Tournament {
         return result.startsWith("1/2-1/2") ? 0 : whiteTurn && result.startsWith("1-0") || !whiteTurn && result.startsWith("0-1") ? 1 : -1;
     }
 
-    public static int playTscp(boolean whiteTurn, int time, String opening, String[] moves) throws Exception {
+    public static int playXboard(String program, boolean whiteTurn, int time, String opening, String[] moves) throws Exception {
         Game game = new Game();
-        Process engine = Runtime.getRuntime().exec(new String[] { "tscp" });
+        String name = defaultString(substringAfterLast(program, "/"), program);
+        Process engine = Runtime.getRuntime().exec(new String[] { program });
         Scanner engineIn = new Scanner(engine.getInputStream());
         PrintWriter engineOut = new PrintWriter(engine.getOutputStream());
         send(engineOut, "xboard");
@@ -100,11 +112,11 @@ public class Tournament {
         System.out.println("[Opening \"" + opening + "\"]");
         System.out.println("[Movetime \"" + time + "\"]");
         if (!whiteTurn) {
-            System.out.println("[White \"tscp\"]");
+            System.out.println("[White \"" + name + "\"]");
             System.out.println("[Black \"chessy\"]");
         } else {
             System.out.println("[White \"chessy\"]");
-            System.out.println("[Black \"tscp\"]");
+            System.out.println("[Black \"" + name + "\"]");
         }
 
         send(engineOut, "force");

@@ -70,7 +70,7 @@ public class UciProtocol {
     }
 
     public static void uci(String parameter) {
-        send("id name Cheesy 0.1");
+        send("id name Chessy 0.1");
         send("id author Francisco Modesto");
         send("id rnd " + ID);
         send("uciok");

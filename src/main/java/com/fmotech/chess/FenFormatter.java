@@ -123,13 +123,19 @@ public class FenFormatter {
     }
 
     public static String moveToFen(Board board, int move) {
-        int src = move & 0xFF;
-        int tgt = (move >>> 8) & 0xFF;
-        int promo = (move >>> 24) & 0x07;
-        if (board.whiteTurn())
-            return TO_TILE_WHITE[src] + TO_TILE_WHITE[tgt] + TO_PROMO[promo];
-        else
-            return TO_TILE_BLACK[src] + TO_TILE_BLACK[tgt] + TO_PROMO[promo];
+        try {
+            int src = move & 0xFF;
+            int tgt = (move >>> 8) & 0xFF;
+            int promo = (move >>> 24) & 0x07;
+            if (board.whiteTurn())
+                return TO_TILE_WHITE[src] + TO_TILE_WHITE[tgt] + TO_PROMO[promo];
+            else
+                return TO_TILE_BLACK[src] + TO_TILE_BLACK[tgt] + TO_PROMO[promo];
+        } catch (Exception e) {
+            System.out.println(board);
+            System.out.println(move);
+            throw e;
+        }
     }
 
     public static int moveFromFen(Board board, String move) {

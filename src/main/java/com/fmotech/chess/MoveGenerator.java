@@ -280,9 +280,7 @@ public class MoveGenerator {
     }
 
     public static boolean isPositionInAttack(Board board, int pos) {
-        if (pos == 64) {
-            System.out.println("HERE");
-        }
+        assert pos < 64;
         long pieces = board.pieces();
         if ((PAWN_ATTACK_HIGH_TABLE[pos] & board.enemyPawns()) != 0) return true;
         if ((KNIGHT_TABLE[pos] & board.enemyKnights()) != 0) return true;
