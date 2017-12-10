@@ -7,6 +7,7 @@ import java.util.Arrays;
 
 import static com.fmotech.chess.Evaluation.evaluateBoardPosition;
 import static com.fmotech.chess.FenFormatter.moveToFen;
+import static com.fmotech.chess.Move.MOVE_PROMO;
 import static com.fmotech.chess.Move.scoreMvvLva;
 import static com.fmotech.chess.MoveGenerator.isInCheck;
 import static com.fmotech.chess.PvData.ALPHA;
@@ -28,6 +29,10 @@ public class AI {
 
     private static final int MIN_VALUE = -32000;
     private static final int MAX_VALUE = 32000;
+    public static final int MAX_DEPTH = 64;
+
+    public static long nodesNegamaxTotal = 0;
+    public static long nodesQuiescenceTotal = 0;
 
     private final long timeout;
     private final int maxDepth;
@@ -42,12 +47,11 @@ public class AI {
     private int failFoundPvCount = 0;
     private int foundPvCount = 0;
     private final Board board;
+    private final KillerMoves killers = new KillerMoves();
 
-    public static long nodesNegamaxTotal = 0;
-    public static long nodesQuiescenceTotal = 0;
     public AI(int millis, int maxDepth, Board board, long[] hashes) {
         this.timeout = System.currentTimeMillis() + (millis <= 0 ? Integer.MAX_VALUE : millis);
-        this.maxDepth = maxDepth;
+        this.maxDepth = Math.min(maxDepth, MAX_DEPTH);
         this.board = board;
         for (int i = board.ply() - 1; i >= board.ply() - board.fifty(); i--) {
             visited.add(hashes[i]);
@@ -131,8 +135,7 @@ public class AI {
         int[] moves = board.moves();
         int c = MoveGenerator.generateDirtyMoves(board, moves);
         int validMoves = 0;
-        sortMoves(c, moves, move(data));
-        boolean foundPv = false;
+        sortMoves(c, moves, move(data), killers.getPrimaryKiller(ply), killers.getSecundaryKiller(ply));
         int bestMove = 0;
 
         for (int i = 0; i < c; i++) {
@@ -142,7 +145,7 @@ public class AI {
 
             validMoves += 1;
             int value;
-            if (foundPv) {
+            if (alpha != initAlpha) {
                 foundPvCount++;
                 value = -negaMax(depth, next.nextTurn(), -alpha - 1, -alpha);
                 if ((value > alpha) && (value < beta)) {
@@ -150,6 +153,14 @@ public class AI {
                     value = -negaMax(depth, next.nextTurn(), -beta, -alpha);
                     failFoundPvCount++;
                 }
+//            } else if (allowLmr && validMoves > 3 && depth - ply > 3 && !pv.containsKey(hash) && !Move.isCapture(moves[i])
+//                    && !Move.hasFlag(moves[i], MOVE_PROMO) && !isInCheck(board) && !isInCheck(next)) {
+//                // Late Move Reduction
+//                value = -negaMax(depth - 2, next.nextTurn(), -alpha - 1, -alpha);
+//                if ((value > alpha) && (value < beta)) {
+//                    // Check for failure.
+//                    value = -negaMax(depth, next.nextTurn(), -beta, -alpha);
+//                }
             } else {
                 value = -negaMax(depth, next.nextTurn(), -beta, -alpha);
             }
@@ -157,13 +168,13 @@ public class AI {
                 if (validMoves == 1) failHighFirst++;
                 failHigh++;
                 table.put(hash, create(BETA, ply, depth - ply, beta, moves[i]));
+                if (!Move.isCapture(moves[i])) killers.addKiller(ply, moves[i]);
                 if (!open) visited.remove(hash);
                 return beta;
             }
             if (value > alpha) {
                 alpha = value;
                 bestMove = moves[i];
-                foundPv = true;
             }
         }
 
@@ -210,7 +221,7 @@ public class AI {
         int c = MoveGenerator.generateDirtyCaptureMoves(board, moves);
         int validMoves = 0;
 
-        sortMoves(c, moves, 0);
+        sortQuiscentMoves(c, moves);
         for (int i = 0; i < c; i++) {
             if (Move.evalCapture(moves[i]) < 0 && See.see(board, moves[i]) < 0)
                 continue;
@@ -241,13 +252,32 @@ public class AI {
     }
 
     static long[] scoredMoves = new long[256];
-    private void sortMoves(int size, int[] moves, int pv) {
+    private void sortMoves(int size, int[] moves, int pv, int k1, int k2) {
         for (int i = 0; i < size; i++) {
-            int score;
+            int score = 0;
             if (moves[i] == pv)
                 score = -1000000;
+            else if (Move.isCapture(moves[i]))
+                score = -(100000 + scoreMvvLva(moves[i]));
+            else if (moves[i] == k1)
+                score = -10000;
+            else if (moves[i] == k2)
+                score = -9999;
+//            else if (moves[i] == k3)
+//                score = -9999;
             else
                 score = -scoreMvvLva(moves[i]);
+            scoredMoves[i] = BitOperations.joinInts(score, moves[i]);
+        }
+        Arrays.sort(scoredMoves, 0, size);
+        for (int i = 0; i < size; i++) {
+            moves[i] = BitOperations.lowInt(scoredMoves[i]);
+        }
+    }
+
+    private void sortQuiscentMoves(int size, int[] moves) {
+        for (int i = 0; i < size; i++) {
+            int score = -scoreMvvLva(moves[i]);
             scoredMoves[i] = BitOperations.joinInts(score, moves[i]);
         }
         Arrays.sort(scoredMoves, 0, size);
