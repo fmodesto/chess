@@ -1,5 +1,6 @@
-package com.fmotech.chess;
+package com.fmotech.chess.ai;
 
+import com.fmotech.chess.ai.KillerMoves;
 import org.junit.Test;
 
 import static org.junit.Assert.*;

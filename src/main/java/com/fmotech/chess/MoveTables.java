@@ -21,9 +21,6 @@ public class MoveTables {
     public static final long[] DIR2_TABLE = computeDir(0b010);
     public static final long[] DIR1_TABLE = computeDir(0b001);
 
-    private static final long NOT_A_FILE = 0x7F7F7F7F7F7F7F7FL;
-    private static final long NOT_H_FILE = 0xFEFEFEFEFEFEFEFEL;
-
     private static long[] computeDir(int bit) {
         long[] table = new long[64];
         for (int i = 0; i < table.length; i++) {

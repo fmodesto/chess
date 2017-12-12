@@ -1,4 +1,4 @@
-package com.fmotech.chess;
+package com.fmotech.chess.game;
 
 public class XboardProtocol {
 

@@ -1,26 +1,30 @@
-package com.fmotech.chess;
+package com.fmotech.chess.ai;
 
+import com.fmotech.chess.BitOperations;
+import com.fmotech.chess.Board;
+import com.fmotech.chess.Move;
+import com.fmotech.chess.MoveGenerator;
+import com.fmotech.chess.game.Console;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.Arrays;
 
-import static com.fmotech.chess.Evaluation.evaluateBoardPosition;
 import static com.fmotech.chess.FenFormatter.moveToFen;
-import static com.fmotech.chess.Move.MOVE_PROMO;
 import static com.fmotech.chess.Move.scoreMvvLva;
 import static com.fmotech.chess.MoveGenerator.isInCheck;
-import static com.fmotech.chess.PvData.ALPHA;
-import static com.fmotech.chess.PvData.BETA;
-import static com.fmotech.chess.PvData.EXACT;
-import static com.fmotech.chess.PvData.OPEN;
-import static com.fmotech.chess.PvData.UNKNOWN;
-import static com.fmotech.chess.PvData.create;
-import static com.fmotech.chess.PvData.depth;
-import static com.fmotech.chess.PvData.move;
-import static com.fmotech.chess.PvData.score;
-import static com.fmotech.chess.PvData.scoreType;
-import static com.fmotech.chess.PvData.status;
+import static com.fmotech.chess.ai.Evaluation.evaluateBoardPosition;
+import static com.fmotech.chess.ai.PvData.ALPHA;
+import static com.fmotech.chess.ai.PvData.BETA;
+import static com.fmotech.chess.ai.PvData.EXACT;
+import static com.fmotech.chess.ai.PvData.OPEN;
+import static com.fmotech.chess.ai.PvData.UNKNOWN;
+import static com.fmotech.chess.ai.PvData.create;
+import static com.fmotech.chess.ai.PvData.depth;
+import static com.fmotech.chess.ai.PvData.move;
+import static com.fmotech.chess.ai.PvData.score;
+import static com.fmotech.chess.ai.PvData.scoreType;
+import static com.fmotech.chess.ai.PvData.status;
 import static java.lang.Float.max;
 import static java.lang.Integer.signum;
 import static java.lang.Math.abs;
@@ -31,27 +35,23 @@ public class AI {
     private static final int MAX_VALUE = 32000;
     public static final int MAX_DEPTH = 64;
 
-    public static long nodesNegamaxTotal = 0;
-    public static long nodesQuiescenceTotal = 0;
+    private final FixSizeTable table = new FixSizeTable(256);
+    private final Long2LongOpenHashMap pv = new Long2LongOpenHashMap();
+    private final LongOpenHashSet visited = new LongOpenHashSet();
+    private final KillerMoves killers = new KillerMoves();
+    private final HistoryHeuristic history = new HistoryHeuristic();
 
-    private final long timeout;
-    private final int maxDepth;
+    private long timeout;
     private int nodes;
     private int initialPly;
-    private FixSizeTable table = new FixSizeTable(512);
-    private Long2LongOpenHashMap pv = new Long2LongOpenHashMap();
-    private LongOpenHashSet visited = new LongOpenHashSet();
-
     private int failHigh = 0;
     private int failHighFirst = 0;
     private int failFoundPvCount = 0;
     private int foundPvCount = 0;
-    private final Board board;
-    private final KillerMoves killers = new KillerMoves();
 
-    public AI(int millis, int maxDepth, Board board, long[] hashes) {
-        this.timeout = System.currentTimeMillis() + (millis <= 0 ? Integer.MAX_VALUE : millis);
-        this.maxDepth = Math.min(maxDepth, MAX_DEPTH);
+    private final Board board;
+
+    public AI(Board board, long[] hashes) {
         this.board = board;
         for (int i = board.ply() - 1; i >= board.ply() - board.fifty(); i--) {
             visited.add(hashes[i]);
@@ -60,7 +60,9 @@ public class AI {
 
     public static class Timeout extends RuntimeException {}
 
-    public int think() {
+    public int think(int millis, int maxDepth) {
+        this.timeout = System.currentTimeMillis() + (millis <= 0 ? Integer.MAX_VALUE : millis);
+        maxDepth = Math.min(maxDepth, MAX_DEPTH);
         int move = 0;
         int depth = 1;
         try {
@@ -102,7 +104,6 @@ public class AI {
     }
 
     private int negaMax(int depth, Board board, int alpha, int beta) {
-        nodesNegamaxTotal++;
         long hash = board.hash();
 
         int initAlpha = alpha;
@@ -135,7 +136,7 @@ public class AI {
         int[] moves = board.moves();
         int c = MoveGenerator.generateDirtyMoves(board, moves);
         int validMoves = 0;
-        sortMoves(c, moves, move(data), killers.getPrimaryKiller(ply), killers.getSecundaryKiller(ply));
+        sortMoves(c, moves, ply, move(data), killers.getPrimaryKiller(ply), killers.getSecundaryKiller(ply));
         int bestMove = 0;
 
         for (int i = 0; i < c; i++) {
@@ -168,7 +169,10 @@ public class AI {
                 if (validMoves == 1) failHighFirst++;
                 failHigh++;
                 table.put(hash, create(BETA, ply, depth - ply, beta, moves[i]));
-                if (!Move.isCapture(moves[i])) killers.addKiller(ply, moves[i]);
+                if (!Move.isCapture(moves[i])) {
+                    killers.addKiller(ply, moves[i]);
+                    history.addMove(ply, depth, moves[i]);
+                }
                 if (!open) visited.remove(hash);
                 return beta;
             }
@@ -204,7 +208,6 @@ public class AI {
     }
 
     private int quiescentSearch(Board board, int alpha, int beta) {
-        nodesQuiescenceTotal++;
         maintenance();
 
         if (board.fifty() >= 100 || status(table.get(board.hash())) == OPEN)
@@ -247,26 +250,26 @@ public class AI {
 
     private void maintenance() {
         nodes += 1;
-        if ((nodes & 0xFFFF) == 0)
+        if ((nodes & 0x0FFF) == 0)
             checkTime();
     }
 
+    public static long maxHeuristic = 0;
     static long[] scoredMoves = new long[256];
-    private void sortMoves(int size, int[] moves, int pv, int k1, int k2) {
+    private void sortMoves(int size, int[] moves, int ply, int pv, int k1, int k2) {
         for (int i = 0; i < size; i++) {
             int score = 0;
             if (moves[i] == pv)
-                score = -1000000;
+                score = -100000000;
             else if (Move.isCapture(moves[i]))
-                score = -(100000 + scoreMvvLva(moves[i]));
+                score = -(10000000 + scoreMvvLva(moves[i]));
             else if (moves[i] == k1)
-                score = -10000;
+                score = -1000000;
             else if (moves[i] == k2)
-                score = -9999;
-//            else if (moves[i] == k3)
-//                score = -9999;
+                score = -999999;
             else
                 score = -scoreMvvLva(moves[i]);
+//                score = -history.scoreMove(ply, moves[i]);
             scoredMoves[i] = BitOperations.joinInts(score, moves[i]);
         }
         Arrays.sort(scoredMoves, 0, size);

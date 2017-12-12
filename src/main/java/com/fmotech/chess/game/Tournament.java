@@ -1,6 +1,5 @@
-package com.fmotech.chess.utils;
+package com.fmotech.chess.game;
 
-import com.fmotech.chess.Game;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import java.io.BufferedReader;

@@ -1,8 +1,10 @@
-package com.fmotech.chess;
+package com.fmotech.chess.ai;
 
+import com.fmotech.chess.Board;
+import com.fmotech.chess.FenFormatter;
 import org.junit.Test;
 
-import static com.fmotech.chess.Evaluation.evaluateBoardPosition;
+import static com.fmotech.chess.ai.Evaluation.evaluateBoardPosition;
 import static com.fmotech.chess.FenFormatter.moveFromFen;
 import static org.junit.Assert.assertEquals;
 

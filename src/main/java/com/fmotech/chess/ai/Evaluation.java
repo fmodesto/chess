@@ -1,4 +1,6 @@
-package com.fmotech.chess;
+package com.fmotech.chess.ai;
+
+import com.fmotech.chess.Board;
 
 import static com.fmotech.chess.BitOperations.fileFill;
 import static com.fmotech.chess.BitOperations.lowestBit;

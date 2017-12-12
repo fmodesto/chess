@@ -1,5 +1,6 @@
-package com.fmotech.chess;
+package com.fmotech.chess.game;
 
+import com.fmotech.chess.game.Game;
 import org.junit.Test;
 
 import static com.fmotech.chess.FenFormatter.fromFen;

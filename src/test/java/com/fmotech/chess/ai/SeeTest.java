@@ -1,5 +1,10 @@
-package com.fmotech.chess;
+package com.fmotech.chess.ai;
 
+import com.fmotech.chess.Board;
+import com.fmotech.chess.DebugUtils;
+import com.fmotech.chess.FenFormatter;
+import com.fmotech.chess.SanFormatter;
+import com.fmotech.chess.ai.See;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -49,31 +54,5 @@ public class SeeTest {
         Board board = Board.fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/1PN2Q1P/P1PBBPp1/R3K2R b KQkq - 0 2");
         int move = FenFormatter.moveFromFen(board, "g2h1q");
         assertEquals(400, See.see(board, move));
-    }
-
-    @Test
-    public void main() throws IOException {
-//        Stream.of("8/2K5/3p4/1Pr5/1R3pk1/8/4P1P1/8 w - - 1 3 ; b4f4 -400")
-        long time = System.currentTimeMillis();
-        AtomicLong nanos = new AtomicLong();
-        Files.lines(Paths.get("see2"))
-                .forEach(e -> {
-                    String fen = trim(substringBefore(e, ";"));
-                    String fenMove = trim(substringBetween(e, "; ", " "));
-                    int value = Integer.parseInt(substringAfterLast(e, " "));
-
-                    Board board = Board.fen(fen);
-                    int move = FenFormatter.moveFromFen(board, fenMove);
-                    long n = System.nanoTime();
-                    int see = See.see(board, move);
-                    nanos.addAndGet(System.nanoTime() - n);
-//
-                    if (see != value) {
-                        System.out.println(fen + " ; " + fenMove + " " + value + " / " + see);
-                    }
-                });
-        System.out.println(System.currentTimeMillis() - time);
-        System.out.println(nanos.get() / 1000000);
-        System.out.println(Files.lines(Paths.get("see2")).count());
     }
 }

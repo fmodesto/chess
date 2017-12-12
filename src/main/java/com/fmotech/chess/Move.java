@@ -1,7 +1,5 @@
 package com.fmotech.chess;
 
-import static com.fmotech.chess.BitOperations.highInt;
-import static com.fmotech.chess.BitOperations.joinInts;
 import static com.fmotech.chess.Board.KING;
 
 public class Move {

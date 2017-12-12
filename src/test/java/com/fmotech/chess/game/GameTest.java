@@ -1,5 +1,7 @@
-package com.fmotech.chess;
+package com.fmotech.chess.game;
 
+import com.fmotech.chess.Board;
+import com.fmotech.chess.game.Game;
 import org.junit.Test;
 
 public class GameTest {

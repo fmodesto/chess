@@ -1,7 +1,7 @@
 package com.fmotech.chess.epd;
 
 
-import com.fmotech.chess.AI;
+import com.fmotech.chess.ai.AI;
 import com.fmotech.chess.Board;
 import com.fmotech.chess.MoveGenerator;
 import org.junit.Assume;
@@ -11,8 +11,6 @@ import org.junit.runners.Parameterized;
 
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -26,7 +24,7 @@ import static org.junit.Assert.assertEquals;
 @RunWith(Parameterized.class)
 public class EpdTests {
 
-    public static final int TIME = 1000;
+    public static final int TIME = 100;
     public static final int EXECUTE = -1;
     private final EpdReader.Epd epd;
 
@@ -52,8 +50,8 @@ public class EpdTests {
             System.out.println("Best moves: " + bm);
         if (am.length() > 0)
             System.out.println("Avoid moves: " + am);
-        AI ai = new AI(TIME, 32, epd.board, new long[2]);
-        int bestMove = ai.think();
+        AI ai = new AI(epd.board, new long[0]);
+        int bestMove = ai.think(TIME, 32);
         List<Integer> expectedBest = EpdReader.getMoves(epd, "bm");
         ignoreFalse(moveToFen(epd.board, bestMove) + " in [" + bm + "]", expectedBest.isEmpty() || expectedBest.contains(bestMove));
         List<Integer> expectedBad = EpdReader.getMoves(epd, "am");

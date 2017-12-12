@@ -1,4 +1,10 @@
-package com.fmotech.chess;
+package com.fmotech.chess.game;
+
+import com.fmotech.chess.BitOperations;
+import com.fmotech.chess.Board;
+import com.fmotech.chess.FenFormatter;
+import com.fmotech.chess.MoveGenerator;
+import com.fmotech.chess.ai.AI;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,14 +50,15 @@ public class Game {
                 "57. g1f1 d5c5 58. h6g6 b2h2 59. g6g5 c5c4 60. g5h5 h2c2 61. g4g5 c4d3 62. h5h6 d6d5 63. h6e6 d3e3 64. e6e5 d5d4 \n" +
                 "65. g5g6 d4d3 66. g6g7 d3d2 67. e5d5 c2c8 68. g7g8r c8g8 69. d5d7 g8f8 70. f1g1 e3e2 71. d7d4 e4e3 72. d4d7 d2d1q \n" +
                 "73. d7d1 e2d1 74. g1h1 e3e2 75. h1g1 e2e1q 76. g1h2 f8g8 77. h2h3 e1g3");
-        System.out.println("\n");
+//        System.out.println("\n");
         long initTime = System.currentTimeMillis();
 //        game.autoPly(2000, 64);
         game.followPly(-1, 7, copy);
         double time = (System.currentTimeMillis() - initTime) / 1000D;
-        System.out.println(AI.nodesNegamaxTotal + " nps " + (AI.nodesNegamaxTotal / time));
-        System.out.println(AI.nodesQuiescenceTotal + " nps " + (AI.nodesQuiescenceTotal / time));
-        System.out.println((AI.nodesNegamaxTotal + AI.nodesQuiescenceTotal) + " nps " + ((AI.nodesNegamaxTotal + AI.nodesQuiescenceTotal) / time));
+//        System.out.println(AI.nodesNegamaxTotal + " nps " + (AI.nodesNegamaxTotal / time));
+//        System.out.println(AI.nodesQuiescenceTotal + " nps " + (AI.nodesQuiescenceTotal / time));
+//        System.out.println((AI.nodesNegamaxTotal + AI.nodesQuiescenceTotal) + " nps " + ((AI.nodesNegamaxTotal + AI.nodesQuiescenceTotal) / time));
+        System.out.println(AI.maxHeuristic);
     }
 
     public static Game load(String pgn) {
@@ -72,11 +79,11 @@ public class Game {
     }
 
     public void move(String raw) {
-        if (board.ply() % 2 == 0)
-            System.out.printf("%2d. ", board.fullMove());
-        System.out.print(raw + " ");
-        if ((board.ply() & 0x0F) == 0x0F)
-            System.out.println();
+//        if (board.ply() % 2 == 0)
+//            System.out.printf("%2d. ", board.fullMove());
+//        System.out.print(raw + " ");
+//        if ((board.ply() & 0x0F) == 0x0F)
+//            System.out.println();
         int move = FEN.matcher(raw).find() ? moveFromFen(board, raw) : moveFromSan(board, raw);
         moves[board.ply()] = move;
         hashes[board.ply()] = board.hash();
@@ -88,7 +95,7 @@ public class Game {
     }
 
     public String thinkMove(int millis, int maxDepth) {
-        return moveToFen(board, new AI(millis, maxDepth, board, hashes).think());
+        return moveToFen(board, new AI(board, hashes).think(millis, maxDepth));
     }
 
     public void autoPly(int millis, int maxDepth) {

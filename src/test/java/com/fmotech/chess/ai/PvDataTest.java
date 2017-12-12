@@ -1,11 +1,13 @@
-package com.fmotech.chess;
+package com.fmotech.chess.ai;
 
+import com.fmotech.chess.DebugUtils;
+import com.fmotech.chess.ai.PvData;
 import org.junit.Test;
 
-import static com.fmotech.chess.PvData.ALPHA;
-import static com.fmotech.chess.PvData.BETA;
-import static com.fmotech.chess.PvData.EXACT;
-import static com.fmotech.chess.PvData.OPEN;
+import static com.fmotech.chess.ai.PvData.ALPHA;
+import static com.fmotech.chess.ai.PvData.BETA;
+import static com.fmotech.chess.ai.PvData.EXACT;
+import static com.fmotech.chess.ai.PvData.OPEN;
 import static org.junit.Assert.assertEquals;
 
 public class PvDataTest {

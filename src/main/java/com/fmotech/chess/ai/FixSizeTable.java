@@ -1,6 +1,4 @@
-package com.fmotech.chess;
-
-import java.util.function.LongBinaryOperator;
+package com.fmotech.chess.ai;
 
 public class FixSizeTable {
 

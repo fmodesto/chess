@@ -13,7 +13,8 @@ import java.util.Map;
 public class ScoreFix {
 
     public static void main(String[] args) throws IOException {
-        List<String> lines = Files.readAllLines(Paths.get("nohup.out"));
+        String name = "hashtable.pgn";
+        List<String> lines = Files.readAllLines(Paths.get(name));
         Map<Integer, String> scores = new HashMap<>();
         int insert = 0;
         for (int i = 0; i < lines.size(); i++) {
@@ -36,6 +37,6 @@ public class ScoreFix {
                 result.add("[Result \"" + scores.get(i) + "\"]");
         }
 
-        Files.write(Paths.get("games.pgn"), result);
+        Files.write(Paths.get("fix_" + name), result);
     }
 }

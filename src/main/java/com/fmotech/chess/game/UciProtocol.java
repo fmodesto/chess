@@ -1,5 +1,6 @@
-package com.fmotech.chess;
+package com.fmotech.chess.game;
 
+import com.fmotech.chess.Board;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.PrintStream;
@@ -104,6 +105,8 @@ public class UciProtocol {
         if (time > 0) {
             time = Math.max(1, time / movesToGo - 50 + inc);
         }
+        System.out.println("Time to use: " + time);
+        System.out.println("WhiteTurn " + game.whiteTurn());
         send("bestmove " + game.thinkMove(time, depth));
     }
 

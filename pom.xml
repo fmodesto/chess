@@ -47,7 +47,7 @@
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.fmotech.chess.utils.Tournament</mainClass>
+                                    <mainClass>com.fmotech.chess.game.Chessy</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>

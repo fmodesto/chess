@@ -1,4 +1,4 @@
-package com.fmotech.chess;
+package com.fmotech.chess.ai;
 
 public class PvData {
 
