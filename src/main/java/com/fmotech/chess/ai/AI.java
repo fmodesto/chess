@@ -26,6 +26,7 @@ import static com.fmotech.chess.ai.PvData.score;
 import static com.fmotech.chess.ai.PvData.scoreType;
 import static com.fmotech.chess.ai.PvData.status;
 import static java.lang.Float.max;
+import static java.lang.Integer.reverse;
 import static java.lang.Integer.signum;
 import static java.lang.Math.abs;
 
@@ -69,13 +70,13 @@ public class AI {
             initialPly = board.ply();
             while (depth <= maxDepth) {
                 long time = System.currentTimeMillis();
-                int score = negaMax(board.ply() + depth, board, MIN_VALUE, MAX_VALUE);
+                int score = negaMax(board.ply() + depth, board, MIN_VALUE, MAX_VALUE, false);
                 time = System.currentTimeMillis() - time;
-                long data = table.get(board.hash());
+                long data = pv.get(board.hash());
                 move = move(data);
                 explainMove(board, score, depth, time);
                 depth++;
-                if (MAX_VALUE - abs(score(data)) <= 512) {
+                if (isMateScore(score(data))) {
                     break;
                 }
             }
@@ -85,9 +86,13 @@ public class AI {
         return move;
     }
 
+    public boolean isMateScore(int score) {
+        return MAX_VALUE - abs(score) <= 512;
+    }
+
     private void explainMove(Board board, int score, int depth, long time) {
         String sc = "cp " + score;
-        if (MAX_VALUE - abs(score) <= 512) {
+        if (isMateScore(score)) {
             int sign = signum(score);
             sc = "mate " + sign * (MAX_VALUE - abs(score) - board.ply());
         }
@@ -103,33 +108,38 @@ public class AI {
         Console.debug("ordering %f pvs %f hash %d/%d pv %d", failHighFirst / max(1F, failHigh), (1 - (failFoundPvCount / max(1F, foundPvCount))), table.overwrite(), table.size(), pv.size());
     }
 
-    private int negaMax(int depth, Board board, int alpha, int beta) {
+    private int negaMax(int totalDepth, Board board, int alpha, int beta, boolean allowNull) {
         long hash = board.hash();
 
         int initAlpha = alpha;
         int ply = board.ply();
+        int depth = totalDepth - ply;
 
         boolean open = visited.contains(hash);
-        if ((open || board.fifty() >= 100) && ply != initialPly)
-            return 0;
-
-        long data = pv.getOrDefault(hash, table.get(hash));
-        if (depth(data) >= depth - ply && scoreType(data) != UNKNOWN) {
-            if (scoreType(data) != BETA && score(data) <= alpha)
-                return alpha;
-            if (scoreType(data) != ALPHA && score(data) >= beta)
-                return beta;
-            if (scoreType(data) == EXACT)
-                return score(data);
+        if ((open || board.fifty() >= 100) && ply != initialPly) {
+            return -50;
         }
 
-        if (ply == depth) {
-            alpha = /*isChecked(board) ? beta :*/ quiescentSearch(board, alpha, beta);
-            recordPv(hash, ply, 0, alpha, move(data), initAlpha, beta);
-            return alpha;
+        if (ply >= totalDepth) {
+            return quiescentSearch(board, alpha, beta);
+        }
+
+        long data = pv.getOrDefault(hash, table.get(hash));
+        if (depth(data) >= depth && scoreType(data) != UNKNOWN) {
+            if (scoreType(data) == EXACT)
+                return score(data);
+            if (scoreType(data) == ALPHA && score(data) <= alpha)
+                return alpha;
+            if (scoreType(data) == BETA && score(data) >= beta)
+                return beta;
         }
 
         maintenance();
+
+        if (allowNull && !pv.containsKey(hash) && depth > 3 && hasMajorPieces(board) && !isInCheck(board)) {
+            int value = -negaMax(totalDepth - 2, board.nextTurn(), -beta, -beta + 1, false);
+            if (!isMateScore(value) && value >= beta) return beta;
+        }
 
         visited.add(hash);
 
@@ -148,30 +158,22 @@ public class AI {
             int value;
             if (alpha != initAlpha) {
                 foundPvCount++;
-                value = -negaMax(depth, next.nextTurn(), -alpha - 1, -alpha);
+                value = -negaMax(totalDepth, next.nextTurn(), -alpha - 1, -alpha, true);
                 if ((value > alpha) && (value < beta)) {
                     // Check for failure.
-                    value = -negaMax(depth, next.nextTurn(), -beta, -alpha);
+                    value = -negaMax(totalDepth, next.nextTurn(), -beta, -alpha, true);
                     failFoundPvCount++;
                 }
-//            } else if (allowLmr && validMoves > 3 && depth - ply > 3 && !pv.containsKey(hash) && !Move.isCapture(moves[i])
-//                    && !Move.hasFlag(moves[i], MOVE_PROMO) && !isInCheck(board) && !isInCheck(next)) {
-//                // Late Move Reduction
-//                value = -negaMax(depth - 2, next.nextTurn(), -alpha - 1, -alpha);
-//                if ((value > alpha) && (value < beta)) {
-//                    // Check for failure.
-//                    value = -negaMax(depth, next.nextTurn(), -beta, -alpha);
-//                }
             } else {
-                value = -negaMax(depth, next.nextTurn(), -beta, -alpha);
+                value = -negaMax(totalDepth, next.nextTurn(), -beta, -alpha, true);
             }
             if (value >= beta) {
                 if (validMoves == 1) failHighFirst++;
                 failHigh++;
-                table.put(hash, create(BETA, ply, depth - ply, beta, moves[i]));
+                table.put(hash, create(BETA, ply, depth, beta, moves[i]));
                 if (!Move.isCapture(moves[i])) {
                     killers.addKiller(ply, moves[i]);
-                    history.addMove(ply, depth, moves[i]);
+                    history.addMove(ply, totalDepth, moves[i]);
                 }
                 if (!open) visited.remove(hash);
                 return beta;
@@ -186,25 +188,23 @@ public class AI {
 
         if (validMoves == 0) {
             alpha = isInCheck(board) ? MIN_VALUE + ply : 0;
-            table.put(hash, create(EXACT, ply, depth - ply, alpha, 0));
+            table.put(hash, create(EXACT, ply, depth, alpha, 0));
             return alpha;
         }
 
-        recordPv(hash, ply, depth - ply, alpha, bestMove, initAlpha, beta);
+        if (alpha != initAlpha) {
+            table.put(hash, create(EXACT, ply, depth, alpha, bestMove));
+        } else {
+            table.put(hash, create(ALPHA, ply, depth, alpha, bestMove));
+        }
         if (bestMove != 0) {
-            pv.put(hash, create(EXACT, ply, depth - ply, alpha, bestMove));
+            pv.put(hash, create(EXACT, ply, depth, alpha, bestMove));
         }
         return alpha;
     }
 
-    private void recordPv(long hash, int ply, int depth, int score, int move, int alpha, int beta) {
-        if (score == alpha) {
-            table.put(hash, create(ALPHA, ply, depth, score, move));
-        } else if (score == beta) {
-            table.put(hash, create(BETA, ply, depth, score, move));
-        } else {
-            table.put(hash, create(EXACT, ply, depth, score, move));
-        }
+    private boolean hasMajorPieces(Board board) {
+        return (board.pieces() ^ (board.kings() | board.pawns())) != 0;
     }
 
     private int quiescentSearch(Board board, int alpha, int beta) {
@@ -268,8 +268,7 @@ public class AI {
             else if (moves[i] == k2)
                 score = -999999;
             else
-                score = -scoreMvvLva(moves[i]);
-//                score = -history.scoreMove(ply, moves[i]);
+                score = -history.scoreMove(ply, moves[i]);
             scoredMoves[i] = BitOperations.joinInts(score, moves[i]);
         }
         Arrays.sort(scoredMoves, 0, size);

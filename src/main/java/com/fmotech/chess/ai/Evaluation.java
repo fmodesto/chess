@@ -2,6 +2,8 @@ package com.fmotech.chess.ai;
 
 import com.fmotech.chess.Board;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static com.fmotech.chess.BitOperations.fileFill;
 import static com.fmotech.chess.BitOperations.lowestBit;
 import static com.fmotech.chess.BitOperations.lowestBitPosition;
@@ -54,6 +56,28 @@ public class Evaluation {
             0,   0,   5,  10,  10,   5,   0,   0
     );
 
+    private static final byte[] KING_OPENING = toBoardPosition(
+          -70, -70, -70, -70, -70, -70, -70, -70,
+          -70, -70, -70, -70, -70, -70, -70, -70,
+          -70, -70, -70, -70, -70, -70, -70, -70,
+          -70, -70, -70, -70, -70, -70, -70, -70,
+          -70, -70, -70, -70, -70, -70, -70, -70,
+          -50, -50, -50, -50, -50, -50, -50, -50,
+          -30, -30, -30, -30, -30, -30, -30, -30,
+            0,   5,   5, -10, -10,   0,  10,   5
+    );
+
+    private static final byte[] KING_ENDING = toBoardPosition(
+          -50, -10,   0,   0,   0,   0, -10, -50,
+          -10,   0,  10,  10,  10,  10,   0, -10,
+            0,  10,  20,  20,  20,  20,  10,   0,
+            0,  10,  20,  40,  40,  20,  10,   0,
+            0,  10,  20,  40,  40,  20,  10,   0,
+            0,  10,  20,  20,  20,  20,  10,   0,
+          -10,   0,  10,  10,  10,  10,   0, -10,
+          -50, -10,   0,   0,   0,   0, -10, -50
+    );
+
     private static final long[] PAWN_ISOLATED_TABLE = createPawnIsolatedMask();
     private static final long[] PAWN_PASSED_TABLE = createPawnPassedMask();
 
@@ -71,6 +95,9 @@ public class Evaluation {
     private static final int QUEEN_SEMI = 3;
     private static final int ROCK_OPEN = 10;
     private static final int ROCK_SEMI = 5;
+    private static final int BISHOP_PAIR = 30;
+    public static final int END_GAME = PAWN + PAWN + KNIGHT + BISHOP + ROCK;
+
 
     private static long[] createPawnPassedMask() {
         long[] positions = new long[64];
@@ -115,40 +142,65 @@ public class Evaluation {
         return array;
     }
 
+    private static AtomicInteger ownValue = new AtomicInteger(0);
+    private static AtomicInteger enemyValue = new AtomicInteger(0);
     public static int evaluateBoardPosition(Board board) {
         long ownOpen = ~fileFill(board.ownPawns());
         long enemyOpen = ~fileFill(board.enemyPawns());
         long open = (ownOpen & enemyOpen);
-        int score = 0;
 
+        int ownScore = 0;
         if ((board.ownPawns() | board.ownQueens() | board.ownRocks()) != 0
                 || nextLowestBit(board.ownKnights() | board.ownBishops()) != 0) {
-            score += evalQueen(board.ownQueens(), open, ownOpen);
-            score += evalRock(board.ownRocks(), open, ownOpen);
-            score += eval(BISHOP, board.ownBishops(), BISHOP_TABLE);
-            score += eval(KNIGHT, board.ownKnights(), KNIGHT_TABLE);
-            score += evalPawns(PAWN, board.ownPawns(), board.enemyPawns());
+            ownValue.set(0);
+            ownScore += evalQueen(board.ownQueens(), open, ownOpen, ownValue);
+            ownScore += evalRock(board.ownRocks(), open, ownOpen, ownValue);
+            ownScore += evalBishop(board.ownBishops(), ownValue);
+            ownScore += evalKnight(board.ownKnights(), ownValue);
+            ownScore += evalPawns(board.ownPawns(), board.enemyPawns(), ownValue);
         }
 
+        int enemyScore = 0;
         if ((board.enemyPawns() | board.enemyQueens() | board.enemyRocks()) != 0
                 || nextLowestBit(board.enemyKnights() | board.enemyBishops()) != 0) {
-            score -= evalQueen(reverse(board.enemyQueens()), open, enemyOpen);
-            score -= evalRock(reverse(board.enemyRocks()), open, enemyOpen);
-            score -= eval(BISHOP, reverse(board.enemyBishops()), BISHOP_TABLE);
-            score -= eval(KNIGHT, reverse(board.enemyKnights()), KNIGHT_TABLE);
-            score -= evalPawns(PAWN, reverse(board.enemyPawns()), reverse(board.ownPawns()));
+            enemyValue.set(0);
+            enemyScore += evalQueen(reverse(board.enemyQueens()), open, enemyOpen, enemyValue);
+            enemyScore += evalRock(reverse(board.enemyRocks()), open, enemyOpen, enemyValue);
+            enemyScore += evalBishop(reverse(board.enemyBishops()), enemyValue);
+            enemyScore += evalKnight(reverse(board.enemyKnights()), enemyValue);
+            enemyScore += evalPawns(reverse(board.enemyPawns()), reverse(board.ownPawns()), enemyValue);
         }
 
+        int score = ownScore - enemyScore;
+        score += evalKing(board.ownKing(), enemyValue.get() <= END_GAME ? KING_ENDING : KING_OPENING);
+        score -= evalKing(reverse(board.enemyKing()), ownValue.get() <= END_GAME ? KING_ENDING : KING_OPENING);
         return score;
     }
 
-    private static int evalRock(long pieces, long open, long semi) {
+    private static int evalKing(long piece, byte[] table) {
+        return table[lowestBitPosition(piece)];
+    }
+
+    private static int evalBishop(long pieces, AtomicInteger piecesValue) {
+        int sum = 0;
+        int count = 0;
+        while (pieces != 0) {
+            sum += BISHOP + BISHOP_TABLE[lowestBitPosition(pieces)];
+            piecesValue.addAndGet(BISHOP);
+            count += 1;
+            pieces = nextLowestBit(pieces);
+        }
+        return count > 1 ? BISHOP_PAIR + sum : sum;
+    }
+
+    private static int evalRock(long pieces, long open, long semi, AtomicInteger piecesValue) {
         int sum = 0;
         long next = pieces;
         while (next != 0) {
             long piece = lowestBit(next);
             int pos = lowestBitPosition(next);
             sum += ROCK + ROCK_TABLE[pos];
+            piecesValue.addAndGet(ROCK);
             if ((piece & open) != 0)
                 sum += ROCK_OPEN;
             else if ((piece & semi) != 0)
@@ -158,12 +210,13 @@ public class Evaluation {
         return sum;
     }
 
-    private static int evalQueen(long pieces, long open, long semi) {
+    private static int evalQueen(long pieces, long open, long semi, AtomicInteger piecesValue) {
         int sum = 0;
         long next = pieces;
         while (next != 0) {
             long piece = lowestBit(next);
             sum += QUEEN;
+            piecesValue.addAndGet(QUEEN);
             if ((piece & open) != 0)
                 sum += QUEEN_OPEN;
             else if ((piece & semi) != 0)
@@ -173,21 +226,23 @@ public class Evaluation {
         return sum;
     }
 
-    private static int eval(int points, long pieces, byte[] table) {
+    private static int evalKnight(long pieces, AtomicInteger piecesValue) {
         int sum = 0;
         while (pieces != 0) {
-            sum += points + table[lowestBitPosition(pieces)];
+            sum += KNIGHT + KNIGHT_TABLE[lowestBitPosition(pieces)];
+            piecesValue.addAndGet(KNIGHT);
             pieces = nextLowestBit(pieces);
         }
         return sum;
     }
 
-    private static int evalPawns(int points, long own, long enemy) {
+    private static int evalPawns(long own, long enemy, AtomicInteger piecesValue) {
         int sum = 0;
         long next = own;
         while (next != 0) {
             int pos = lowestBitPosition(next);
-            sum += points + PAWN_TABLE[pos];
+            sum += PAWN + PAWN_TABLE[pos];
+            piecesValue.addAndGet(PAWN);
             if ((PAWN_ISOLATED_TABLE[pos] & own) == 0)
                 sum += PAWN_ISOLATED;
             if ((PAWN_PASSED_TABLE[pos] & enemy) == 0)

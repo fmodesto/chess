@@ -17,9 +17,9 @@ public class Vice {
                 .forEach(System.out::println);
     }
 
-    private static String eval(String fen) {
+    public static int eval(String fen) {
         try {
-            Process engine = Runtime.getRuntime().exec(new String[]{"/Users/fran/Projects/vice/Ch81/vice"});
+            Process engine = Runtime.getRuntime().exec(new String[]{"/Users/fran/Projects/vice/Ch95/Vice_poly/Source/vice"});
             Scanner engineIn = new Scanner(engine.getInputStream());
             PrintWriter engineOut = new PrintWriter(engine.getOutputStream());
             send(engineOut, "vice");
@@ -27,9 +27,9 @@ public class Vice {
             send(engineOut, "eval");
             String value = expect(engineIn, "Eval:");
             send(engineOut, "quit");
-            return "assertEquals(" + value + ", eval(\"" + fen + "\"));";
+            return Integer.parseInt(value);
         } catch (Exception e) {
-            return "Error";
+            return Integer.MIN_VALUE;
         }
     }
 

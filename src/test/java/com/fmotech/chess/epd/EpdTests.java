@@ -29,12 +29,11 @@ public class EpdTests {
     private final EpdReader.Epd epd;
 
     @Parameterized.Parameters
-    public static List<Object[]> data() throws Exception {
+    public static List<Object[]> data() {
         List<Object[]> tests = EpdReader.read(Paths.get("src/test/resources/wacnew.epd"))
                 .map(e -> new Object[]{e})
                 .collect(Collectors.toList());
         return EXECUTE < 0 ? tests : Collections.singletonList(tests.get(EXECUTE));
-
     }
 
     public EpdTests(EpdReader.Epd epd) {
@@ -64,14 +63,6 @@ public class EpdTests {
 
     private void ignoreTrue(String message, boolean condition) {
         Assume.assumeFalse(message, condition);
-    }
-
-    public void execute(long expected, Board board, int level) {
-        System.out.println(board);
-        LocalDateTime start = now();
-        long count = MoveGenerator.countMoves(level, board);
-        System.out.printf("%d: %10d in %6d ms\n", level, count, MILLIS.between(start, now()));
-        assertEquals(expected, countMoves(level, board));
     }
 }
 
