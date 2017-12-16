@@ -5,7 +5,6 @@ import com.fmotech.chess.Board;
 import com.fmotech.chess.Move;
 import com.fmotech.chess.MoveGenerator;
 import com.fmotech.chess.game.Console;
-import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.Arrays;
@@ -17,11 +16,10 @@ import static com.fmotech.chess.ai.Evaluation.evaluateBoardPosition;
 import static com.fmotech.chess.ai.PvData.ALPHA;
 import static com.fmotech.chess.ai.PvData.BETA;
 import static com.fmotech.chess.ai.PvData.EXACT;
-import static com.fmotech.chess.ai.PvData.create;
 import static com.fmotech.chess.ai.PvData.move;
+import static com.fmotech.chess.ai.PvData.ply;
 import static com.fmotech.chess.ai.PvData.score;
 import static com.fmotech.chess.ai.PvData.scoreType;
-import static java.lang.Float.max;
 import static java.lang.Integer.signum;
 import static java.lang.Math.abs;
 
@@ -65,9 +63,6 @@ public class AiVice {
                 move = move(data);
                 explainMove(board, score, depth, time);
                 depth++;
-                if (isMateScore(score(data))) {
-                    break;
-                }
             }
         } catch (Timeout e) {
         }
@@ -123,7 +118,7 @@ public class AiVice {
         long data = table.get(hash);
         if (PvData.isValid(data) && PvData.depth(data) >= depth) {
             if (scoreType(data) == EXACT)
-                return score(data);
+                return fixScore(ply, data);
             if (scoreType(data) == ALPHA && score(data) <= alpha)
                 return alpha;
             if (scoreType(data) == BETA && score(data) >= beta)
@@ -184,6 +179,14 @@ public class AiVice {
             table.put(hash, PvData.create(PvData.ALPHA, ply, depth, alpha, bestMove));
 
         return alpha;
+    }
+
+    private int fixScore(int ply, long data) {
+        int score = score(data);
+        if (!isMateScore(score))
+            return score;
+
+        return score < 0 ? score - ply(data) + ply : score + ply(data) - ply;
     }
 
     private int quiescence(int alpha, int beta, Board board) {
