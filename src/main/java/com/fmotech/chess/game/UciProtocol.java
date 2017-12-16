@@ -31,7 +31,7 @@ public class UciProtocol {
 
     private static Map<String, Method> commands;
     private static PrintStream logs;
-    private static Game game;
+    private static Game game = new Game();
 
     public static void execute() {
         commands = Arrays.stream(UciProtocol.class.getMethods())
@@ -77,6 +77,13 @@ public class UciProtocol {
         send("uciok");
     }
 
+    public static void ucinewgame(String parameter) {
+        // make sure we can free memory
+        game = null;
+        System.gc();
+        game = new Game();
+    }
+
     public static void isReady(String parameter) {
         send("readyok");
     }
@@ -84,7 +91,7 @@ public class UciProtocol {
     public static void position(String parameter) {
         String initial = defaultString(substringBefore(parameter, "moves"), parameter);
         String moves = substringAfter(parameter, "moves");
-        game = new Game(initial.startsWith("fen") ? fromFen(substringAfter(initial, "fen")) : Board.INIT);
+        game.resetBoard(initial.startsWith("fen") ? fromFen(substringAfter(initial, "fen")) : Board.INIT);
         for (String fenMove : split(moves, " ")) {
             game.move(fenMove);
         }
@@ -106,7 +113,6 @@ public class UciProtocol {
             time = Math.max(1, time / movesToGo - 50 + inc);
         }
         System.out.println("Time to use: " + time);
-        System.out.println("WhiteTurn " + game.whiteTurn());
         send("bestmove " + game.thinkMove(time, depth));
     }
 

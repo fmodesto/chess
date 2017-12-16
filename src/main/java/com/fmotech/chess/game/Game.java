@@ -5,6 +5,7 @@ import com.fmotech.chess.Board;
 import com.fmotech.chess.FenFormatter;
 import com.fmotech.chess.MoveGenerator;
 import com.fmotech.chess.ai.AI;
+import com.fmotech.chess.ai.AiVice;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,7 +20,8 @@ import static org.apache.commons.lang3.StringUtils.trim;
 
 public class Game {
 
-    private final Board initBoard;
+    private AiVice ai = new AiVice();
+    private Board initBoard;
     private Board board;
     private int[] moves = new int[512];
     private long[] hashes = new long[512];
@@ -40,25 +42,27 @@ public class Game {
 //                "65. c7c8q g8h7 66. b2b4 h7g7 67. b4b5 g7h7 68. b5b6 h7g7 69. b6b7 g7f7 70. b7b8q f7g6 71. b8g3 g6f7 72. g3g4 f7e7 \n" +
 //                "73. g4e6");
         Game copy = Game.load(
-                " 1. e2e4 e7e5  2. b1c3 b8c6  3. f1c4 f8c5  4. d2d3 d7d6  5. d1h5 g7g6  6. h5d1 d8h4  7. g2g3 h4d8  8. c3d5 c8e6 \n" +
-                " 9. g1f3 e6d5 10. e4d5 c6a5 11. c1e3 c5e3 12. f2e3 a5c4 13. d3c4 f7f5 14. c2c3 g8f6 15. d1a4 d8d7 16. a4d7 e8d7 \n" +
-                "17. a1d1 h8e8 18. f3g5 c7c6 19. d1d3 f6e4 20. g5e4 f5e4 21. d3d1 c6d5 22. c4d5 e8f8 23. e1e2 g6g5 24. g3g4 d7e7 \n" +
-                "25. h1f1 f8f1 26. d1f1 a8c8 27. f1f5 h7h6 28. f5f1 c8c5 29. f1d1 c5a5 30. a2a3 a5c5 31. e2f2 e7f8 32. f2g1 f8g8 \n" +
-                "33. d1d2 g8h8 34. d2d1 h8h7 35. d1d2 h7g8 36. d2d1 g8h8 37. d1d2 h8h7 38. d2d1 h7g7 39. d1d2 g7f7 40. d2f2 f7e8 \n" +
-                "41. f2d2 e8d8 42. d2d1 d8c8 43. d1d2 c8b8 44. d2d1 b8c7 45. g1g2 c7b6 46. a3a4 c5c4 47. a4a5 b6a6 48. d1c1 c4c5 \n" +
-                "49. c3c4 a6a5 50. c1a1 a5b4 51. a1a7 b4c4 52. a7b7 c4d5 53. b7f7 d5e6 54. f7h7 c5c2 55. g2g1 c2b2 56. h7h6 e6d5 \n" +
-                "57. g1f1 d5c5 58. h6g6 b2h2 59. g6g5 c5c4 60. g5h5 h2c2 61. g4g5 c4d3 62. h5h6 d6d5 63. h6e6 d3e3 64. e6e5 d5d4 \n" +
-                "65. g5g6 d4d3 66. g6g7 d3d2 67. e5d5 c2c8 68. g7g8r c8g8 69. d5d7 g8f8 70. f1g1 e3e2 71. d7d4 e4e3 72. d4d7 d2d1q \n" +
-                "73. d7d1 e2d1 74. g1h1 e3e2 75. h1g1 e2e1q 76. g1h2 f8g8 77. h2h3 e1g3");
+                "1. e2e4 e7e5 2. g1f3 b8c6 3. d2d4 e5d4 4. f3d4 d8h4 5. b1c3 f8b4 6. d1d3 b4c3 7. b2c3 g8f6 8. d4f5 h4g4 \n" +
+                "9. f2f3 g4g6 10. g2g4 h7h6 11. c1f4 d7d6 12. e1c1 e8g8 13. d3b5 g6h7 14. f1d3 a7a6 15. b5b1 h7h8 16. h1e1 f8e8 \n" +
+                "17. f5d4 c6e5 18. d3e2 a8b8 19. b1b2 g7g5 20. f4e3 d6d5 21. e4d5 f6d5 22. e3d2 h8f6 23. c3c4 d5f4 24. e2f1 c8d7 \n" +
+                "25. d2c3 f4g6 26. h2h3 b7b6 27. f1e2 g6h4 28. e2f1 f6f4 29. c3d2 f4g3 30. e1e3 c7c5 31. d4e2 g3h2 32. b2c3 f7f6 \n" +
+                "33. d2e1 h4g6 34. e1g3 h2h1 35. f3f4 g5f4 36. e2f4 g6f4 37. g3f4 b8d8 38. f1e2 h1g2 39. c3b3 g2b7 40. f4h6 d7c6 \n" +
+                "41. d1d8 e8d8 42. h6f4 e5g6 43. f4h2 c6e4 44. b3b2 d8d4 45. e3b3 b7h7 46. h2g1 d4d6 47. b3e3 g6f4 48. b2b3 h7h6 \n" +
+                "49. e2f1 f4g2 50. f1g2 e4g2 51. c1b2 f6f5 52. g4f5 h6f6 53. c2c3 f6g5 54. h3h4 g5h4 55. b3a4 b6b5 56. a4a5 g2e4 \n" +
+                "57. a5c7 d6d2 58. b2a3 d2g2 59. c7e5 g2g4 60. e5c5 h4d8 61. g1f2 d8d2 62. c5c8 g8f7 63. c8c7 f7f6 64. c7b6 f6f5 \n" +
+                "65. b6c5 f5g6 66. c5c8 d2c1 67. a3b4 c1b2 68. b4a5 b2a2 69. a5b6 g6g5 70. c8g8 g5f4 71. g8f7 f4g5 72. e3h3 a2f2 \n" +
+                "73. f7f2 e4f5 74. c4b5 a6b5 75. h3g3 f5d7 76. f2d2 g5f6 77. d2d6 f6g5 78. g3f3 g4a4 79. d6d7 a4f4 80. d7g7 g5f5 \n" +
+                "81. g7f7 f5g5 82. f7f4 g5h5 83. f3g3 b5b4 84. f4g5 ");
 //        System.out.println("\n");
         long initTime = System.currentTimeMillis();
-//        game.autoPly(2000, 64);
+//        game.autoPly(-1, 7);
         game.followPly(-1, 7, copy);
         double time = (System.currentTimeMillis() - initTime) / 1000D;
 //        System.out.println(AI.nodesNegamaxTotal + " nps " + (AI.nodesNegamaxTotal / time));
 //        System.out.println(AI.nodesQuiescenceTotal + " nps " + (AI.nodesQuiescenceTotal / time));
 //        System.out.println((AI.nodesNegamaxTotal + AI.nodesQuiescenceTotal) + " nps " + ((AI.nodesNegamaxTotal + AI.nodesQuiescenceTotal) / time));
         System.out.println(AI.maxHeuristic);
+        System.out.println(game.pgn());
     }
 
     public static Game load(String pgn) {
@@ -95,7 +99,8 @@ public class Game {
     }
 
     public String thinkMove(int millis, int maxDepth) {
-        return moveToFen(board, new AI(board, hashes).think(millis, maxDepth));
+        ai.setPreviousPositions(board.ply(), hashes);
+        return moveToFen(board, ai.think(millis, maxDepth, board));
     }
 
     public void autoPly(int millis, int maxDepth) {
@@ -241,5 +246,16 @@ public class Game {
             index += 1;
         }
         return trim(sb.toString());
+    }
+
+    public void resetAI() {
+        // Make sure we can free the memory, not sure if needed?
+        ai = null;
+        ai = new AiVice();
+    }
+
+    public void resetBoard(Board board) {
+        this.initBoard = board;
+        this.board = board;
     }
 }

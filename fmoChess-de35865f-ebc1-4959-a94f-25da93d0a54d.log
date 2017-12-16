@@ -1,0 +1,12 @@
+<< id name Chessy 0.1
+<< id author Francisco Modesto
+<< id rnd de35865f-ebc1-4959-a94f-25da93d0a54d
+<< uciok
+>> position startpos
+processing time: 119
+>> go depth 8
+<< bestmove e2e4
+processing time: 900
+>> go depth 9
+<< bestmove e2e4
+processing time: 1824

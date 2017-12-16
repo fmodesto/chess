@@ -1,12 +1,15 @@
 package com.fmotech.chess.ai;
 
+import com.fmotech.chess.Move;
+
+import java.util.Arrays;
+
 public class HistoryHeuristic {
 
-    private int[] table = new int[2 * 64 * 64];
+    private int[] table = new int[2 * 6 * 64];
 
     public void addMove(int ply, int depth, int move) {
-        int d = depth - ply;
-        table[index(ply, move)] += d * d;
+        table[index(ply, move)] += depth;
     }
 
     public int scoreMove(int ply, int move) {
@@ -14,6 +17,13 @@ public class HistoryHeuristic {
     }
 
     private int index(int ply, int move) {
-        return (((move >>> 2) & 0x3F00) | (move & 0x3F)) << (ply & 1);
+        int index = ((Move.srcType(move) - 1) << 7);
+        index |= (ply & 1) << 6;
+        index |= Move.tgtPos(move);
+        return index;
+    }
+
+    public void clear() {
+        Arrays.fill(table, 0);
     }
 }

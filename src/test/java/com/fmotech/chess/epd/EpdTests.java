@@ -24,7 +24,7 @@ import static org.junit.Assert.assertEquals;
 @RunWith(Parameterized.class)
 public class EpdTests {
 
-    public static final int TIME = 100;
+    public static final int TIME = 2000;
     public static final int EXECUTE = -1;
     private final EpdReader.Epd epd;
 

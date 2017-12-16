@@ -1,0 +1,5 @@
+<< id name Chessy 0.1
+<< id author Francisco Modesto
+<< id rnd 587ab9c9-2b88-4a06-aa80-1996709647d5
+<< uciok
+>> go depth 8

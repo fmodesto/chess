@@ -1,5 +1,7 @@
 package com.fmotech.chess.ai;
 
+import java.util.Arrays;
+
 public class KillerMoves {
 
     private final int[] killers = new int[128];
@@ -24,5 +26,9 @@ public class KillerMoves {
 
     public int findIndex(int ply) {
         return (ply & 0x3F) << 1;
+    }
+
+    public void clear() {
+        Arrays.fill(killers, 0);
     }
 }
