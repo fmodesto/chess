@@ -98,7 +98,6 @@ public class Evaluation {
     private static final int BISHOP_PAIR = 30;
     public static final int END_GAME = PAWN + PAWN + KNIGHT + BISHOP + ROCK;
 
-
     private static long[] createPawnPassedMask() {
         long[] positions = new long[64];
         for (int i = 0; i < 64; i++) {
@@ -144,6 +143,11 @@ public class Evaluation {
 
     private static AtomicInteger ownValue = new AtomicInteger(0);
     private static AtomicInteger enemyValue = new AtomicInteger(0);
+
+    public static int evaluateBoardPosition(Board board, int alpha, int beta) {
+        return evaluateBoardPosition(board);
+    }
+
     public static int evaluateBoardPosition(Board board) {
         long ownOpen = ~fileFill(board.ownPawns());
         long enemyOpen = ~fileFill(board.enemyPawns());

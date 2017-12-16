@@ -208,7 +208,7 @@ public class AI {
         if (board.fifty() >= 100 || visited.contains(board.hash()))
             return 0;
 
-        int value = evaluateBoardPosition(board);
+        int value = evaluateBoardPosition(board, alpha, beta);
 
         if (value >= beta)
             return beta;

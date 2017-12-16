@@ -192,7 +192,7 @@ public class AiVice {
         if (isDraw(board))
             return 0;
 
-        int score = evaluateBoardPosition(board);
+        int score = evaluateBoardPosition(board, alpha, beta);
         if (score >= beta)
             return beta;
 
@@ -204,6 +204,9 @@ public class AiVice {
 
         sortQuiscentMoves(c, moves);
         for (int i = 0; i < c; i++) {
+            if (Move.evalCapture(moves[i]) < 0 && See.see(board, moves[i]) < 0)
+                continue;
+
             Board next = board.move(moves[i]);
             if (!MoveGenerator.isValid(next))
                 continue;
