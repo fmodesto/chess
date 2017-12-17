@@ -5,7 +5,6 @@ import com.fmotech.chess.Board;
 import com.fmotech.chess.FenFormatter;
 import com.fmotech.chess.MoveGenerator;
 import com.fmotech.chess.ai.AI;
-import com.fmotech.chess.ai.AiVice;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +19,7 @@ import static org.apache.commons.lang3.StringUtils.trim;
 
 public class Game {
 
-    private AiVice ai = new AiVice();
+    private AI ai = new AI();
     private Board initBoard;
     private Board board;
     private int[] moves = new int[512];
@@ -61,7 +60,6 @@ public class Game {
 //        System.out.println(AI.nodesNegamaxTotal + " nps " + (AI.nodesNegamaxTotal / time));
 //        System.out.println(AI.nodesQuiescenceTotal + " nps " + (AI.nodesQuiescenceTotal / time));
 //        System.out.println((AI.nodesNegamaxTotal + AI.nodesQuiescenceTotal) + " nps " + ((AI.nodesNegamaxTotal + AI.nodesQuiescenceTotal) / time));
-        System.out.println(AI.maxHeuristic);
         System.out.println(game.pgn());
     }
 
@@ -249,9 +247,7 @@ public class Game {
     }
 
     public void resetAI() {
-        // Make sure we can free the memory, not sure if needed?
-        ai = null;
-        ai = new AiVice();
+        ai.reset();
     }
 
     public void resetBoard(Board board) {

@@ -78,10 +78,7 @@ public class UciProtocol {
     }
 
     public static void ucinewgame(String parameter) {
-        // make sure we can free memory
-        game = null;
-        System.gc();
-        game = new Game();
+        game.resetAI();
     }
 
     public static void isReady(String parameter) {
