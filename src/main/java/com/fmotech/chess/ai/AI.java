@@ -5,12 +5,12 @@ import com.fmotech.chess.Board;
 import com.fmotech.chess.Move;
 import com.fmotech.chess.MoveGenerator;
 import com.fmotech.chess.game.Console;
-import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.Arrays;
 
 import static com.fmotech.chess.FenFormatter.moveToFen;
+import static com.fmotech.chess.Move.MOVE_PROMO;
 import static com.fmotech.chess.Move.scoreMvvLva;
 import static com.fmotech.chess.MoveGenerator.isInCheck;
 import static com.fmotech.chess.ai.Evaluation.evaluateBoardPosition;
@@ -30,7 +30,6 @@ public class AI {
     public static final int MAX_DEPTH = 64;
     private static final int NO_MOVE = 0;
 
-    private final Long2LongOpenHashMap pv = new Long2LongOpenHashMap();
     private final FixSizeTable table = new FixSizeTable(256);
     private final LongOpenHashSet visited = new LongOpenHashSet();
     private final KillerMoves killers = new KillerMoves();
@@ -61,7 +60,7 @@ public class AI {
                 long time = System.currentTimeMillis();
                 int score = alphaBeta(-INFINITE, INFINITE, depth, board, false);
                 time = System.currentTimeMillis() - time;
-                long data = pv.get(board.hash());
+                long data = table.get(board.hash());
                 move = move(data);
                 explainMove(board, score, depth, time);
                 depth++;
@@ -85,7 +84,7 @@ public class AI {
 
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < depth; i++) {
-            int move = move(pv.get(board.hash()));
+            int move = move(table.get(board.hash()));
             if (move == 0) break;
             sb.append(moveToFen(board, move)).append(" ");
             board = board.move(move).nextTurn();
@@ -96,21 +95,7 @@ public class AI {
     private void clearForSearch(Board board) {
         history.clear();
         killers.clear();
-        updatePv(board);
         nodes = 0;
-    }
-
-    private void updatePv(Board board) {
-        int counter = 0;
-        while (move(pv.get(board.hash())) != 0 && counter < 32) {
-            scoredMoves[counter++] = board.hash();
-            scoredMoves[counter++] = pv.get(board.hash());
-            board = board.move(move(pv.get(board.hash()))).nextTurn();
-        }
-        pv.clear();
-        for (int i = 0; i < counter; i += 2) {
-            pv.put(scoredMoves[i], scoredMoves[i+1]);
-        }
     }
 
     private int alphaBeta(int alpha, int beta, int depth, Board board, boolean allowNull) {
@@ -131,7 +116,7 @@ public class AI {
         if (inCheck)
             depth += 1;
 
-        long data = pv.getOrDefault(hash, table.get(hash));
+        long data = table.get(hash);
         if (PvData.isValid(data) && PvData.depth(data) >= depth) {
             if (scoreType(data) == EXACT)
                 return fixScore(ply, data);
@@ -141,7 +126,7 @@ public class AI {
                 return beta;
         }
 
-        if (allowNull && !inCheck && hasMajorPieces(board) && depth >= 4) {
+        if (AIOptions.allowNullMove && allowNull && !inCheck && hasMajorPieces(board) && depth >= 4) {
             int score = -alphaBeta(-beta, -beta + 1, depth - 4, board.nextTurn(), false);
             if (score >= beta)
                 return beta;
@@ -189,12 +174,10 @@ public class AI {
             return inCheck ? -INFINITE + ply : 0;
         }
 
-        if (alpha != oldAlpha) {
+        if (alpha != oldAlpha)
             table.put(hash, PvData.create(PvData.EXACT, ply, depth, bestScore, bestMove));
-            pv.put(hash, PvData.create(PvData.EXACT, ply, depth, bestScore, bestMove));
-        } else {
+        else
             table.put(hash, PvData.create(PvData.ALPHA, ply, depth, alpha, bestMove));
-        }
         return alpha;
     }
 
@@ -220,7 +203,7 @@ public class AI {
             alpha = score;
 
         int[] moves = board.moves();
-        int c = MoveGenerator.generateDirtyCaptureMoves(board, moves);
+        int c = AIOptions.allowCheckEvasions && isInCheck(board) ? MoveGenerator.generateDirtyMoves(board, moves) : MoveGenerator.generateDirtyCaptureMoves(board, moves);
 
         sortQuiscentMoves(c, moves);
         for (int i = 0; i < c; i++) {
@@ -262,6 +245,8 @@ public class AI {
                 score = -1000000;
             else if (moves[i] == k2)
                 score = -999999;
+            else if (Move.hasFlag(moves[i], MOVE_PROMO))
+                score = -(999900 + Move.promotion(moves[i]));
             else
                 score = -history.scoreMove(ply, moves[i]);
             scoredMoves[i] = BitOperations.joinInts(score, moves[i]);
@@ -296,7 +281,6 @@ public class AI {
     }
 
     public void reset() {
-        pv.clear();
         table.clear();
         visited.clear();
         history.clear();

@@ -97,7 +97,7 @@ public class MoveGenerator {
 
     public static int generateDirtyCaptureMoves(Board board, int[] moves) {
         int counter = 0;
-        counter = generatePawnAttackMoves(board, counter, moves);
+        counter = generatePawnAttackAndQueenPromotionsMoves(board, counter, moves);
         counter = generateRocksMoves(board, board.enemyPieces(), counter, moves);
         counter = generateKnightAttackMoves(board, counter, moves);
         counter = generateBishopsMoves(board, board.enemyPieces(), counter, moves);
@@ -114,13 +114,18 @@ public class MoveGenerator {
         return generateTargetMoves(board, board.ownKnights(), board.enemyPieces(), KNIGHT_TABLE, KNIGHT, counter, moves);
     }
 
-    private static int generatePawnAttackMoves(Board board, int counter, int[] moves) {
+    private static int generatePawnAttackAndQueenPromotionsMoves(Board board, int counter, int[] moves) {
         long pawns = board.ownPawns();
         while (pawns != 0) {
             long pawn = lowestBit(pawns);
             int srcPos = lowestBitPosition(pawns);
             int promote = (pawn & RANK_7) != 0 ? MOVE_PROMO : 0;
-            long next = PAWN_ATTACK_HIGH_TABLE[srcPos] & board.enemyPieces();
+            long next = pawn << 8;
+            if ((pawn & RANK_7) != 0 && (board.pieces() & next) == 0) {
+                int tgtPos = lowestBitPosition(next);
+                moves[counter++] = Move.create(srcPos, tgtPos, PAWN, 0, MOVE_PROMO | QUEEN);
+            }
+            next = PAWN_ATTACK_HIGH_TABLE[srcPos] & board.enemyPieces();
             while (next != 0) {
                 int tgtPos = lowestBitPosition(next);
                 int capture = board.type(tgtPos, ROCK, SPECIAL);
