@@ -13,10 +13,10 @@ import static com.fmotech.chess.FenFormatter.moveToFen;
 import static com.fmotech.chess.Move.MOVE_PROMO;
 import static com.fmotech.chess.Move.scoreMvvLva;
 import static com.fmotech.chess.MoveGenerator.isInCheck;
-import static com.fmotech.chess.ai.Evaluation.evaluateBoardPosition;
 import static com.fmotech.chess.ai.PvData.ALPHA;
 import static com.fmotech.chess.ai.PvData.BETA;
 import static com.fmotech.chess.ai.PvData.EXACT;
+import static com.fmotech.chess.ai.PvData.isValid;
 import static com.fmotech.chess.ai.PvData.move;
 import static com.fmotech.chess.ai.PvData.ply;
 import static com.fmotech.chess.ai.PvData.score;
@@ -26,7 +26,7 @@ import static java.lang.Math.abs;
 
 public class AI {
 
-    private static final int INFINITE = 32000;
+    public static final int INFINITE = 32000;
     public static final int MAX_DEPTH = 64;
     private static final int NO_MOVE = 0;
 
@@ -34,6 +34,7 @@ public class AI {
     private final LongOpenHashSet visited = new LongOpenHashSet();
     private final KillerMoves killers = new KillerMoves();
     private final HistoryHeuristic history = new HistoryHeuristic();
+    private final Evaluation evaluation = AIOptions.evaluation();
 
     private long timeout;
     private int nodes;
@@ -117,7 +118,7 @@ public class AI {
             depth += 1;
 
         long data = table.get(hash);
-        if (PvData.isValid(data) && PvData.depth(data) >= depth) {
+        if (isValid(data) && PvData.depth(data) >= depth) {
             if (scoreType(data) == EXACT)
                 return fixScore(ply, data);
             if (scoreType(data) == ALPHA && score(data) <= alpha)
@@ -195,7 +196,7 @@ public class AI {
         if (isDraw(board))
             return 0;
 
-        int score = evaluateBoardPosition(board, alpha, beta);
+        int score = evaluation.evaluateBoardPosition(board, alpha, beta);
         if (score >= beta)
             return beta;
 

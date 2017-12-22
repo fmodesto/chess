@@ -13,12 +13,12 @@ public class Board {
     private static final long RANK_1 = 0x00_00_00_00_00_00_00_ffL;
     private static final long RANK_8 = 0xff_00_00_00_00_00_00_00L;
 
-    private static final long LOW_ROCK = 1L;
-    private static final long HIGH_ROCK = 1L << 7;
+    private static final long LOW_ROOK = 1L;
+    private static final long HIGH_ROOK = 1L << 7;
 
     public static final int KING = 0b100;
     public static final int QUEEN = 0b110;
-    public static final int ROCK = 0b101;
+    public static final int ROOK = 0b101;
     public static final int BISHOP = 0b011;
     public static final int KNIGHT = 0b010;
     public static final int PAWN = 0b001;
@@ -46,11 +46,11 @@ public class Board {
         return new Board().set(ply, b4, b3, b2, b1);
     }
 
-    public static Board of(int ply, int fifty, long color, long pawns, long rocks, long knights, long bishops, long queens, long kings, long enPassant, long castle) {
+    public static Board of(int ply, int fifty, long color, long pawns, long rooks, long knights, long bishops, long queens, long kings, long enPassant, long castle) {
         return Board.of(BitOperations.joinInts(fifty, ply), color,
-                queens | kings | rocks | enPassant | castle,
+                queens | kings | rooks | enPassant | castle,
                 queens | knights | bishops | enPassant | castle,
-                pawns | bishops | rocks | enPassant | castle);
+                pawns | bishops | rooks | enPassant | castle);
     }
 
     public static Board fen(String fen) {
@@ -117,8 +117,8 @@ public class Board {
             long b2 = this.b2 & clear;
             long b1 = this.b1 & clear;
             promotion = promotion == 0 && (dest & RANK_8) != 0 ? QUEEN : promotion;
-            long p3 = promotion == 0 ? 0 : (promotion >> 2 & 1) * dest;
-            long p2 = promotion == 0 ? 0 : (promotion >> 1 & 1) * dest;
+            long p3 = promotion == 0 ? 0 : (promotion >>> 2 & 1) * dest;
+            long p2 = promotion == 0 ? 0 : (promotion >>> 1 & 1) * dest;
             long p1 = promotion == 0 ? dest : (promotion & 1) * dest;
             b4 |= whiteTurn() ? 0 : src | enPassantKill | (oldEnPassant & ~dest);
             b3 |= newEnPassant | p3;
@@ -146,7 +146,7 @@ public class Board {
             b1 |= castle;
             long ply = (dest & enemyPieces()) == 0 ? this.ply : (currentPly + 1) << 32 | currentPly;
             return nextBoard().set(ply, b4, b3, b2, b1);
-        } else if ((src & ownRocks() & RANK_1) != 0) {
+        } else if ((src & ownRooks() & RANK_1) != 0) {
             long clear = ~(src | dest | enPassant());
             long b4 = this.b4 & clear;
             long b3 = this.b3 & clear;
@@ -189,16 +189,12 @@ public class Board {
         return b3 & b2 & b1 & EN_PASSANT;
     }
 
-    public long castle() {
-        return b3 & b2 & b1 & CASTLE;
-    }
-
     public boolean castleLow() {
-        return ((castle() & LOW_ROCK) == LOW_ROCK) && ((pieces() & (0x0E | ownKing())) == ownKing());
+        return ((castle() & LOW_ROOK) == LOW_ROOK) && ((pieces() & (0x0E | ownKing())) == ownKing());
     }
 
     public boolean castleHigh() {
-        return ((castle() & HIGH_ROCK) == HIGH_ROCK) && ((pieces() & (0x70 | ownKing())) == ownKing());
+        return ((castle() & HIGH_ROOK) == HIGH_ROOK) && ((pieces() & (0x70 | ownKing())) == ownKing());
     }
 
     public int type(int pos, int castle, int enPassant) {
@@ -223,7 +219,7 @@ public class Board {
         return ~b3 & ~b2 & b1;
     }
 
-    public long rocks() {
+    public long rooks() {
         return b3 & (~b2 | CASTLE) & b1;
     }
 
@@ -243,6 +239,10 @@ public class Board {
         return b3 & ~b2 & ~b1;
     }
 
+    public long castle() {
+        return b3 & b2 & b1 & CASTLE;
+    }
+
     // Own pieces
 
     public long ownPieces() {
@@ -253,7 +253,7 @@ public class Board {
         return ~b4 & ~b3 & ~b2 & b1;
     }
 
-    public long ownRocks() {
+    public long ownRooks() {
         return ~b4 & b3 & (~b2 | CASTLE) & b1;
     }
 
@@ -273,6 +273,10 @@ public class Board {
         return ~b4 & b3 & ~b2 & ~b1;
     }
 
+    public long ownCastle() {
+        return castle() & RANK_1;
+    }
+
     // Enemy pieces
 
     public long enemyPieces() {
@@ -283,7 +287,7 @@ public class Board {
         return b4 & ~b3 & ~b2 & b1;
     }
 
-    public long enemyRocks() {
+    public long enemyRooks() {
         return b4 & b3 & (~b2 | CASTLE) & b1;
     }
 
@@ -301,6 +305,10 @@ public class Board {
 
     public long enemyKing() {
         return b4 & b3 & ~b2 & ~b1;
+    }
+
+    public long enemyCastle() {
+        return castle() & RANK_8;
     }
 
     @Override

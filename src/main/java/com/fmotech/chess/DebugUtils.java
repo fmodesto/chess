@@ -24,7 +24,7 @@ public class DebugUtils {
 
     private static Board createBoardFor(boolean whiteTurn, String r8, String r7, String r6, String r5, String r4, String r3, String r2, String r1) {
         String raw = r8 + " " + r7 + " " + r6 + " " + r5 + " " + r4 + " " + r3 + " " + r2 + " " + r1;
-        long pawns = 0, rocks = 0, knights = 0, bishops = 0, queens = 0, kings = 0, color = 0, enPassant = 0, castle = 0;
+        long pawns = 0, rooks = 0, knights = 0, bishops = 0, queens = 0, kings = 0, color = 0, enPassant = 0, castle = 0;
 
         int idx = 0;
         for (int i = raw.length() - 1; i >= 0; i -= 2) {
@@ -34,7 +34,7 @@ public class DebugUtils {
             color |= p < 6 ? 0: b;
             p += p < 6 ? 0 : -6;
             if (p == 0) pawns |= b;
-            else if (p == 1) rocks |= b;
+            else if (p == 1) rooks |= b;
             else if (p == 2) knights |= b;
             else if (p == 3) bishops |= b;
             else if (p == 4) queens |= b;
@@ -50,7 +50,7 @@ public class DebugUtils {
             s += 1;
         }
         if ((enPassant & 0x0000_FF00_0000_0000L) != 0) color |= enPassant;
-        Board board = Board.of(0, 0, color, pawns, rocks, knights, bishops, queens, kings, enPassant, castle);
+        Board board = Board.of(0, 0, color, pawns, rooks, knights, bishops, queens, kings, enPassant, castle);
         return whiteTurn ? board : board.nextTurn();
     }
 
@@ -68,6 +68,10 @@ public class DebugUtils {
 
     public static void debug(String symbols, int type, long board) {
         debug(symbols, Board.of(0, 0, test(type, 0b100) ? board : 0, test(type, 0b010) ? board : 0, test(type, 0b001) ? board : 0));
+    }
+
+    public static void debugRev(String symbols, int type, long board) {
+        debug(symbols, type, BitOperations.reverse(board));
     }
 
     private static boolean test(int type, int mask) {

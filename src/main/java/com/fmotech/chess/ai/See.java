@@ -67,7 +67,7 @@ public class See {
         if ((attackers & board.pawns()) != 0) return lowestBit(attackers & board.pawns());
         if ((attackers & board.knights()) != 0) return lowestBit(attackers & board.knights());
         if ((attackers & board.bishops()) != 0) return lowestBit(attackers & board.bishops());
-        if ((attackers & board.rocks()) != 0) return lowestBit(attackers & board.rocks());
+        if ((attackers & board.rooks()) != 0) return lowestBit(attackers & board.rooks());
         if ((attackers & board.queens()) != 0) return lowestBit(attackers & board.queens());
         if ((attackers & board.kings()) != 0) return lowestBit(attackers & board.kings());
         return 0;
@@ -82,13 +82,13 @@ public class See {
         for (int i = 0; i < 8; i += 2)
             attackers |= (board.bishops() | board.queens()) & slidingAttacks(tgt, ~pieces, i);
         for (int i = 1; i < 8; i += 2)
-            attackers |= (board.rocks() | board.queens()) & slidingAttacks(tgt, ~pieces, i);
+            attackers |= (board.rooks() | board.queens()) & slidingAttacks(tgt, ~pieces, i);
         return attackers & pieces;
     }
 
     private static long updateAttackers(Board board, int pos, long tgt, long last, long pieces) {
         int dir8 = slidingDirection(pos, last);
-        long attackers = (dir8 & 1) != 0 ? board.rocks() | board.queens() : board.bishops() | board.queens();
+        long attackers = (dir8 & 1) != 0 ? board.rooks() | board.queens() : board.bishops() | board.queens();
         return attackers & slidingAttacks(tgt, ~pieces, dir8) & pieces;
     }
 }

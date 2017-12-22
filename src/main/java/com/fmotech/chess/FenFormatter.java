@@ -6,7 +6,7 @@ import static com.fmotech.chess.BitOperations.lowestBitPosition;
 import static com.fmotech.chess.BitOperations.nextLowestBit;
 import static com.fmotech.chess.Board.KING;
 import static com.fmotech.chess.Board.PAWN;
-import static com.fmotech.chess.Board.ROCK;
+import static com.fmotech.chess.Board.ROOK;
 import static com.fmotech.chess.Board.SPECIAL;
 import static com.fmotech.chess.Move.MOVE_EP_CAP;
 import static com.fmotech.chess.Move.MOVE_PROMO;
@@ -24,7 +24,7 @@ public class FenFormatter {
         String[] parts = normalizeSpace(fen).split("\\s+");
         boolean whiteTurn = "w".equals(parts[1]);
         long b = 1L << 63;
-        long pawns = 0, rocks = 0, knights = 0, bishops = 0, queens = 0, kings = 0, color = 0, castle = 0, enPassant = 0;
+        long pawns = 0, rooks = 0, knights = 0, bishops = 0, queens = 0, kings = 0, color = 0, castle = 0, enPassant = 0;
         for (char c : parts[0].toCharArray()) {
             if (Character.isDigit(c)) {
                 b >>>= c - '0';
@@ -32,7 +32,7 @@ public class FenFormatter {
                 char p = Character.toLowerCase(c);
                 if (Character.isLowerCase(c)) color |= b;
                 if (p == 'p') pawns |= b;
-                else if (p == 'r') rocks |= b;
+                else if (p == 'r') rooks |= b;
                 else if (p == 'n') knights |= b;
                 else if (p == 'b') bishops |= b;
                 else if (p == 'q') queens |= b;
@@ -41,10 +41,10 @@ public class FenFormatter {
             }
         }
         for (char c : parts[2].toCharArray()) {
-            if (c == 'K' && (kings & 1L << 3) != 0) castle |= 1L & rocks;
-            if (c == 'Q' && (kings & 1L << 3) != 0) castle |= 1L << 7 & rocks;
-            if (c == 'k' && (kings & 1L << 59) != 0) castle |= 1L << 56 & rocks;
-            if (c == 'q' && (kings & 1L << 59) != 0) castle |= 1L << 63 & rocks;
+            if (c == 'K' && (kings & 1L << 3) != 0) castle |= 1L & rooks;
+            if (c == 'Q' && (kings & 1L << 3) != 0) castle |= 1L << 7 & rooks;
+            if (c == 'k' && (kings & 1L << 59) != 0) castle |= 1L << 56 & rooks;
+            if (c == 'q' && (kings & 1L << 59) != 0) castle |= 1L << 63 & rooks;
         }
         if (!"-".equals(parts[3])) {
             int p = 8 * (parts[3].charAt(1) - '1') + (7 - (Character.toLowerCase(parts[3].charAt(0)) - 'a'));
@@ -54,7 +54,7 @@ public class FenFormatter {
         int ply = 2 * (Integer.parseInt(parts[5]) - 1);
         int fifty = ply - Integer.parseInt(parts[4]) + (whiteTurn ? 0 : 1);
 
-        Board board = Board.of(ply, fifty, color, pawns, rocks, knights, bishops, queens, kings, enPassant, castle);
+        Board board = Board.of(ply, fifty, color, pawns, rooks, knights, bishops, queens, kings, enPassant, castle);
         return whiteTurn ? board : board.nextTurn();
     }
 
@@ -66,13 +66,13 @@ public class FenFormatter {
 
         char[] array = new char[64];
         fill(array, board.ownPawns(), 'P');
-        fill(array, board.ownRocks(), 'R');
+        fill(array, board.ownRooks(), 'R');
         fill(array, board.ownKnights(), 'N');
         fill(array, board.ownBishops(), 'B');
         fill(array, board.ownQueens(), 'Q');
         fill(array, board.ownKing(), 'K');
         fill(array, board.enemyPawns(), 'p');
-        fill(array, board.enemyRocks(), 'r');
+        fill(array, board.enemyRooks(), 'r');
         fill(array, board.enemyKnights(), 'n');
         fill(array, board.enemyBishops(), 'b');
         fill(array, board.enemyQueens(), 'q');
@@ -142,11 +142,11 @@ public class FenFormatter {
         int src = tile(board.whiteTurn(), substring(move, 0, 2));
         int tgt = tile(board.whiteTurn(), substring(move, 2, 4));
         int flags = move.length() == 5 ? MOVE_PROMO | FROM_PROMO[move.charAt(4)] : 0;
-        int srcType = board.type(src, ROCK, 0);
-        int tgtType = board.type(tgt, ROCK, srcType == PAWN ? SPECIAL : 0);
+        int srcType = board.type(src, ROOK, 0);
+        int tgtType = board.type(tgt, ROOK, srcType == PAWN ? SPECIAL : 0);
         if (srcType == PAWN && tgtType == SPECIAL) {
             if ((flags & MOVE_PROMO) != 0) {
-                tgtType = ROCK;
+                tgtType = ROOK;
             } else {
                 tgtType = PAWN;
                 flags |= MOVE_EP_CAP;
@@ -168,7 +168,7 @@ public class FenFormatter {
     private static int[] createFromPromos() {
         int[] table = new int[256];
         table['q'] = table['Q'] = Board.QUEEN;
-        table['r'] = table['R'] = Board.ROCK;
+        table['r'] = table['R'] = Board.ROOK;
         table['b'] = table['B'] = Board.BISHOP;
         table['n'] = table['N'] = Board.KNIGHT;
         return table;
@@ -194,7 +194,7 @@ public class FenFormatter {
         String[] table = new String[8];
         Arrays.fill(table, "");
         table[Board.QUEEN] = "q";
-        table[Board.ROCK] = "r";
+        table[Board.ROOK] = "r";
         table[Board.BISHOP] = "b";
         table[Board.KNIGHT] = "n";
         return table;

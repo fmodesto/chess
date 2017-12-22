@@ -55,7 +55,7 @@ public class Game {
 //        System.out.println("\n");
         long initTime = System.currentTimeMillis();
 //        game.autoPly(-1, 7);
-        game.followPly(-1, 7, copy);
+        game.followPly(2000, 64, copy);
         double time = (System.currentTimeMillis() - initTime) / 1000D;
 //        System.out.println(AI.nodesNegamaxTotal + " nps " + (AI.nodesNegamaxTotal / time));
 //        System.out.println(AI.nodesQuiescenceTotal + " nps " + (AI.nodesQuiescenceTotal / time));
@@ -168,9 +168,9 @@ public class Game {
     private boolean isDrawMaterial() {
         if (count(board.ownPawns(), board.enemyPawns()) >= 1)
             return false;
-        if (count(board.ownQueens(), board.ownRocks()) >= 1)
+        if (count(board.ownQueens(), board.ownRooks()) >= 1)
             return false;
-        if (count(board.enemyQueens(), board.enemyRocks()) >= 1)
+        if (count(board.enemyQueens(), board.enemyRooks()) >= 1)
             return false;
         if (count(board.ownKnights(), board.ownBishops()) >= 2)
             return false;

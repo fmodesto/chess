@@ -1,31 +1,15 @@
-package com.fmotech.chess.ai;
+package com.fmotech.chess.ai.mediocre;
 
 import com.fmotech.chess.Board;
 import com.fmotech.chess.FenFormatter;
-import com.fmotech.chess.utils.Vice;
-import org.junit.Ignore;
 import org.junit.Test;
 
-import static com.fmotech.chess.ai.Evaluation.evaluateBoardPosition;
-import static com.fmotech.chess.FenFormatter.moveFromFen;
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
-public class EvaluationTest {
+public class MediocreBoardEvaluationTest {
 
     @Test
-    public void testMaximumPuntuation() {
-        Board board = FenFormatter.fromFen("R6R/3Q4/1Q4Q1/4Q3/2Q4Q/Q4Q2/pp1Q4/kBNN1KB1 w - - 0 1");
-        System.out.println(evaluateBoardPosition(board));
-        System.out.println(evaluateBoardPosition(Board.INIT));
-        System.out.println(evaluateBoardPosition(Board.INIT.nextTurn()));
-        System.out.println(evaluateBoardPosition(Board.INIT.move(moveFromFen(Board.INIT, "e2e4"))));
-        System.out.println(evaluateBoardPosition(Board.fen("rnb1kbnr/ppp2ppp/4pq2/3p4/8/2NBPN2/PPPP1PPP/R1BQK2R b KQkq - 0 5")));
-        System.out.println(evaluateBoardPosition(Board.fen("rnb1kbnr/ppp2ppp/4pq2/3p4/8/2NBPN2/PPPP1PPP/R1BQ1K1R b KQkq - 0 5")));
-    }
-
-    @Test
-    @Ignore
-    public void evaluateBoard() {
+    public void testConversion() {
         eval("2rr3k/pp3pp1/1nnqbN1p/3pN3/2pP4/2P3Q1/PPB4P/R4RK1");
         eval("8/7p/5k2/5p2/p1p2P2/Pr1pPK2/1P1R3P/8");
         eval("5rk1/1ppb3p/p1pb4/6q1/3P1p1r/2P1R2P/PP1BQ1P1/5RKN");
@@ -328,10 +312,13 @@ public class EvaluationTest {
         eval("b2b1r1k/3R1ppp/4qP2/4p1PQ/4P3/5B2/4N1K1/8");
     }
 
-    private void eval(String fen) {
-        int w = evaluateBoardPosition(Board.fen(fen + " w - - 0 1"));
-        int b = evaluateBoardPosition(Board.fen(fen + " w - - 0 1").nextTurn());
-        assertEquals(w, -b);
-        assertEquals(Vice.eval(fen), w);
+    private static void eval(String fen) {
+        Board board = Board.fen(fen + " w - - 0 1");
+        MediocreBoard mediocre = new MediocreBoard();
+        mediocre.initBoard(board);
+        assertEquals(FenFormatter.toFen(board), mediocre.getFen());
+        board = Board.fen(fen + " b - - 13 1");
+        mediocre.initBoard(board);
+        assertEquals(FenFormatter.toFen(board), mediocre.getFen());
     }
 }

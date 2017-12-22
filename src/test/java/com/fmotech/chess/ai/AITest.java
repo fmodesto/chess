@@ -17,6 +17,6 @@ public class AITest {
     @Test
     public void testEndgame() {
         Game game = new Game(Board.fen("8/8/7k/8/5KR1/8/8/8 b - - 40 99"));
-        System.out.println(game.thinkMove(-1, 20));
+        System.out.println(game.thinkMove(-1, 12));
     }
 }

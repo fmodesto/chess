@@ -7,8 +7,8 @@ public class MoveTables {
     public static final long[] PAWN_ATTACK_HIGH_TABLE = computePawnAttackHigh();
     public static final long[] PAWN_ATTACK_LOW_TABLE = computePawnAttackLow();
 
-    public static final long[] ROCK_HIGH_TABLE = computeRockHigh();
-    public static final long[] ROCK_LOW_TABLE = computeRockLow();
+    public static final long[] ROOK_HIGH_TABLE = computeRookHigh();
+    public static final long[] ROOK_LOW_TABLE = computeRookLow();
 
     public static final long[] BISHOP_HIGH_TABLE = computeBishopHigh();
     public static final long[] BISHOP_LOW_TABLE = computeBishopLow();
@@ -86,7 +86,7 @@ public class MoveTables {
         return positions;
     }
 
-    private static long[] computeRockHigh() {
+    private static long[] computeRookHigh() {
         long up = computeUp();
         long left = computeLeft();
         long[] positions = new long[64];
@@ -108,7 +108,7 @@ public class MoveTables {
         return positions;
     }
 
-    private static long[] computeRockLow() {
+    private static long[] computeRookLow() {
         long down = computeDown();
         long right = computeRight();
         long[] positions = new long[64];

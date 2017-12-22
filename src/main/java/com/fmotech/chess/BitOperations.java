@@ -1,5 +1,7 @@
 package com.fmotech.chess;
 
+import java.util.Random;
+
 public class BitOperations {
 
     public static int lowestBitPosition(long n) {
@@ -30,6 +32,15 @@ public class BitOperations {
         return Long.bitCount(n);
     }
 
+    public static int sparseBitCount(long n) {
+        int count = 0;
+        while (n != 0) {
+            count += 1;
+            n = nextLowestBit(n);
+        }
+        return count;
+    }
+
     public static long reverse(long n) {
         return Long.reverseBytes(n);
     }
@@ -47,21 +58,28 @@ public class BitOperations {
     }
 
     public static int highInt(long n) {
-        return  (int) (n >> 32);
+        return  (int) (n >>> 32);
     }
 
     public static int lowInt(long n) {
         return  (int) n;
     }
 
+    public static long northFill(long n) {
+        n |= (n <<  8);
+        n |= (n << 16);
+        n |= (n << 32);
+        return n;
+    }
+
     public static long southFill(long n) {
-        n |= (n >>  8);
-        n |= (n >> 16);
-        n |= (n >> 32);
-        return n & 0xFFL;
+        n |= (n >>>  8);
+        n |= (n >>> 16);
+        n |= (n >>> 32);
+        return n;
     }
 
     public static long fileFill(long n) {
-        return 0x0101010101010101L * southFill(n);
+        return 0x0101010101010101L * (southFill(n) & 0xFFL);
     }
 }

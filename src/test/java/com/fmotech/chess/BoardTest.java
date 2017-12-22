@@ -210,7 +210,7 @@ public class BoardTest {
     }
 
     @Test
-    public void rockMovesWhite() {
+    public void rookMovesWhite() {
         Board board = Board.INIT
                 .move(w("a2a3")).nextTurn()
                 .move(b("a7a6")).nextTurn()
