@@ -1,8 +1,7 @@
 package com.fmotech.chess.ai;
 
-import com.fmotech.chess.BitOperations;
 import com.fmotech.chess.Board;
-import com.fmotech.chess.DebugUtils;
+import com.fmotech.chess.Moves;
 
 import static com.fmotech.chess.BitOperations.bitCount;
 import static com.fmotech.chess.BitOperations.fileFill;
@@ -11,7 +10,7 @@ import static com.fmotech.chess.BitOperations.lowestBitPosition;
 import static com.fmotech.chess.BitOperations.nextLowestBit;
 import static com.fmotech.chess.BitOperations.northFill;
 import static com.fmotech.chess.BitOperations.southFill;
-import static com.fmotech.chess.BitOperations.sparseBitCount;
+import static com.fmotech.chess.MoveGenerator.generateKnightMask;
 import static com.fmotech.chess.ai.EvaluationUtils.A1;
 import static com.fmotech.chess.ai.EvaluationUtils.A2;
 import static com.fmotech.chess.ai.EvaluationUtils.A3;
@@ -165,11 +164,11 @@ public class ChessyEvaluation implements Evaluation {
         public int mgPosition;
         public int egPosition;
 
-        public int mgTrapped;
-        public int egTrapped;
-
         public int mgDeffense;
         public int egDeffense;
+
+        public int trapped;
+        public int mobility;
 
         public void reset() {
             mgMaterial = 0;
@@ -178,19 +177,19 @@ public class ChessyEvaluation implements Evaluation {
             mgPosition = 0;
             egPosition = 0;
 
-            mgTrapped = 0;
-            egTrapped = 0;
-
             mgDeffense = 0;
             egDeffense = 0;
+
+            trapped = 0;
+            mobility = 0;
         }
 
         public int mgTotal() {
-            return mgMaterial + mgPosition + mgTrapped + mgDeffense;
+            return mgMaterial + mgPosition + mgDeffense + trapped + mobility;
         }
 
         public int egTotal() {
-            return egMaterial + egPosition + egTrapped + egDeffense;
+            return egMaterial + egPosition + egDeffense + trapped + mobility;
         }
 
         @Override
@@ -200,10 +199,10 @@ public class ChessyEvaluation implements Evaluation {
                     ", egMaterial=" + egMaterial +
                     ", mgPosition=" + mgPosition +
                     ", egPosition=" + egPosition +
-                    ", mgTrapped=" + mgTrapped +
-                    ", egTrapped=" + egTrapped +
                     ", mgDeffense=" + mgDeffense +
                     ", egDeffense=" + egDeffense +
+                    ", trapped=" + trapped +
+                    ", mobility=" + mobility +
                     '}';
         }
     }
@@ -220,20 +219,33 @@ public class ChessyEvaluation implements Evaluation {
         ownEvaluation.reset();
         enemyEvaluation.reset();
 
-        evalPawns(OWN_SIDE, ownEvaluation, board.ownPawns(), board.enemyPawns());
-        evalKnight(OWN_SIDE, ownEvaluation, board.ownKnights());
-        evalBishop(OWN_SIDE, ownEvaluation, board.ownBishops());
-        evalRook(OWN_SIDE, ownEvaluation, board.ownRooks(), open, ownOpen);
-        evalQueen(OWN_SIDE, ownEvaluation, board.ownQueens(), open, ownOpen);
-        evalKing(OWN_SIDE, ownEvaluation, board.ownKing(), board.ownCastle(), board.ownPawns());
-        evalOwnTrappedPieces(ownEvaluation, board);
+        long ownMask = 0;
+        long enemyMask = 0;
+        long tmpMask = 0;
 
-        evalPawns(ENEMY_SIDE, enemyEvaluation, board.enemyPawns(), board.ownPawns());
-        evalKnight(ENEMY_SIDE, enemyEvaluation, board.enemyKnights());
-        evalBishop(ENEMY_SIDE, enemyEvaluation, board.enemyBishops());
-        evalRook(ENEMY_SIDE, enemyEvaluation, board.enemyRooks(), open, enemyOpen);
-        evalQueen(ENEMY_SIDE, enemyEvaluation, board.enemyQueens(), open, enemyOpen);
+        ownMask |= evalPawns(OWN_SIDE, ownEvaluation, board.ownPawns(), board.enemyPawns());
+        enemyMask |= evalPawns(ENEMY_SIDE, enemyEvaluation, board.enemyPawns(), board.ownPawns());
+
+        tmpMask = evalKnight(OWN_SIDE, ownEvaluation, board.ownKnights(), board.pieces(), board.ownPieces(), enemyMask);
+        enemyMask |= evalKnight(ENEMY_SIDE, enemyEvaluation, board.enemyKnights(), board.pieces(), board.enemyPieces(), ownMask);
+        ownMask |= tmpMask;
+
+        tmpMask = evalBishop(OWN_SIDE, ownEvaluation, board.ownBishops(), board.pieces(), board.ownPieces(), enemyMask);
+        enemyMask |= evalBishop(ENEMY_SIDE, enemyEvaluation, board.enemyBishops(), board.pieces(), board.enemyPieces(), ownMask);
+        ownMask |= tmpMask;
+
+        tmpMask = evalRook(OWN_SIDE, ownEvaluation, board.ownRooks(), open, ownOpen, board.pieces(), board.ownPieces(), enemyMask);
+        enemyMask |= evalRook(ENEMY_SIDE, enemyEvaluation, board.enemyRooks(), open, enemyOpen, board.pieces(), board.enemyPieces(), ownMask);
+        ownMask |= tmpMask;
+
+        tmpMask = evalQueen(OWN_SIDE, ownEvaluation, board.ownQueens(), open, ownOpen, board.pieces(), board.ownPieces(), enemyMask);
+        enemyMask |= evalQueen(ENEMY_SIDE, enemyEvaluation, board.enemyQueens(), open, enemyOpen, board.pieces(), board.enemyPieces(), ownMask);
+        ownMask |= tmpMask;
+
+        evalKing(OWN_SIDE, ownEvaluation, board.ownKing(), board.ownCastle(), board.ownPawns());
         evalKing(ENEMY_SIDE, enemyEvaluation, board.enemyKing(), board.enemyCastle(), board.enemyPawns());
+
+        evalOwnTrappedPieces(ownEvaluation, board);
         evalEnemyTrappedPieces(enemyEvaluation, board);
 
         return adjustScore(board, mgScore(ownEvaluation, enemyEvaluation), egScore(ownEvaluation, enemyEvaluation));
@@ -278,8 +290,8 @@ public class ChessyEvaluation implements Evaluation {
 
         int phase = TOTAL_PHASE;
         phase -= KNIGHT_BISHOP_PHASE * bitCount(board.knights() | board.bishops());
-        phase -= ROOK_PHASE * sparseBitCount(board.rooks());
-        phase -= QUEEN_PHASE * sparseBitCount(board.queens());
+        phase -= ROOK_PHASE * bitCount(board.rooks());
+        phase -= QUEEN_PHASE * bitCount(board.queens());
 
         return (phase * 256 + (TOTAL_PHASE / 2)) / TOTAL_PHASE;
     }
@@ -306,7 +318,7 @@ public class ChessyEvaluation implements Evaluation {
         score += trapped(board.ownPawns(), board.pieces(), board.ownBishops(), D2, D3, C1, -30);
         score += trapped(board.ownPawns(), board.pieces(), E2, E3, -20);
         score += trapped(board.ownPawns(), board.pieces(), board.ownBishops(), E2, E3, F1, -30);
-        evaluation.mgTrapped = evaluation.egTrapped = score;
+        evaluation.trapped = score;
     }
 
     void evalEnemyTrappedPieces(Evaluation evaluation, Board board) {
@@ -331,7 +343,7 @@ public class ChessyEvaluation implements Evaluation {
         score += trapped(board.enemyPawns(), board.pieces(), board.enemyBishops(), D7, D6, C8, -30);
         score += trapped(board.enemyPawns(), board.pieces(), E7, E6, -20);
         score += trapped(board.enemyPawns(), board.pieces(), board.enemyBishops(), E7, E6, F8, -30);
-        evaluation.mgTrapped = evaluation.egTrapped = score;
+        evaluation.trapped = score;
     }
 
     private int trapped(long mask1, long mask2, long set1, long set2, int score) {
@@ -346,87 +358,7 @@ public class ChessyEvaluation implements Evaluation {
         return (mask1 & set1) == set1 && (mask2 & set2) == set2 && (mask3 & set3) == set3 ? score : 0;
     }
 
-    final void evalKing(int side, Evaluation evaluation, long piece, long castle, long pawns) {
-        int pos = lowestBitPosition(piece);
-        evaluation.mgPosition += KING_OPENING[side][pos];
-        evaluation.egPosition += KING_ENDING[side][pos];
-        if (castle == 0) {
-            evaluation.mgDeffense -= bitCount(pawnShield(side, pos, pawns));
-        }
-    }
-
-    private long pawnShield(int side, int pos, long pawns) {
-        long shield = PAWN_PASSED_TABLE[side][pos];
-        long mask = side == OWN_SIDE ? northFill(shield & pawns) : southFill(shield & pawns);
-        return shield & ~mask;
-    }
-
-    private void evalBishop(int side, Evaluation evaluation, long pieces) {
-        int count = 0;
-        while (pieces != 0) {
-            int pos = lowestBitPosition(pieces);
-            evaluation.mgMaterial += BISHOP;
-            evaluation.mgPosition += BISHOP_TABLE[side][pos];
-            evaluation.egMaterial += BISHOP_EG;
-            evaluation.egPosition += BISHOP_TABLE[side][pos];
-            count += 1;
-            pieces = nextLowestBit(pieces);
-        }
-        if (count > 1) {
-            evaluation.mgPosition += BISHOP_PAIR;
-            evaluation.egPosition += BISHOP_PAIR;
-        }
-    }
-
-    private void evalRook(int side, Evaluation evaluation, long pieces, long open, long semi) {
-        long next = pieces;
-        while (next != 0) {
-            long piece = lowestBit(next);
-            int pos = lowestBitPosition(next);
-            evaluation.mgMaterial += ROOK;
-            evaluation.mgPosition += ROOK_TABLE[side][pos];
-            evaluation.egMaterial += ROOK_EG;
-            evaluation.egPosition += ROOK_TABLE[side][pos];
-            if ((piece & open) != 0) {
-                evaluation.mgPosition += ROOK_OPEN;
-                evaluation.egPosition += ROOK_OPEN;
-            } else if ((piece & semi) != 0) {
-                evaluation.mgPosition += ROOK_SEMI;
-                evaluation.egPosition += ROOK_SEMI;
-            }
-            next = nextLowestBit(next);
-        }
-    }
-
-    private void evalQueen(int side, Evaluation evaluation, long pieces, long open, long semi) {
-        long next = pieces;
-        while (next != 0) {
-            long piece = lowestBit(next);
-            evaluation.mgMaterial += QUEEN;
-            evaluation.egMaterial += QUEEN_EG;
-            if ((piece & open) != 0) {
-                evaluation.mgPosition += QUEEN_OPEN;
-                evaluation.egPosition += QUEEN_OPEN;
-            } else if ((piece & semi) != 0) {
-                evaluation.mgPosition += QUEEN_SEMI;
-                evaluation.egPosition += QUEEN_SEMI;
-            }
-            next = nextLowestBit(next);
-        }
-    }
-
-    private void evalKnight(int side, Evaluation evaluation, long pieces) {
-        while (pieces != 0) {
-            int pos = lowestBitPosition(pieces);
-            evaluation.mgMaterial += KNIGHT;
-            evaluation.mgPosition += KNIGHT_TABLE[side][pos];
-            evaluation.egMaterial += KNIGHT_EG;
-            evaluation.egPosition += KNIGHT_TABLE[side][pos];
-            pieces = nextLowestBit(pieces);
-        }
-    }
-
-    private void evalPawns(int side, Evaluation evaluation, long own, long enemy) {
+    private long evalPawns(int side, Evaluation evaluation, long own, long enemy) {
         long next = own;
         int doubled = 0;
         while (next != 0) {
@@ -450,6 +382,128 @@ public class ChessyEvaluation implements Evaluation {
             doubled |= fileMask(pos);
             next = nextLowestBit(next);
         }
+        return side == OWN_SIDE ? nw(own) | ne(own) : sw(own) | se(own);
+    }
+
+    private long evalKnight(int side, Evaluation evaluation, long knights, long pieces, long own, long attackMask) {
+        long mobilityMask = 0;
+        while (knights != 0) {
+            int pos = lowestBitPosition(knights);
+            evaluation.mgMaterial += KNIGHT;
+            evaluation.mgPosition += KNIGHT_TABLE[side][pos];
+            evaluation.egMaterial += KNIGHT_EG;
+            evaluation.egPosition += KNIGHT_TABLE[side][pos];
+            long mask = generateKnightMask(pos, pieces, own);
+            evaluation.mobility += bitCount(mask);
+            evaluation.mobility += 2 * bitCount(mask & ~attackMask);
+            mobilityMask |= mask;
+            knights = nextLowestBit(knights);
+        }
+        return 0;
+    }
+
+    private long evalBishop(int side, Evaluation evaluation, long bishops, long pieces, long own, long attackMask) {
+        long mobilityMask = 0;
+        int count = 0;
+        while (bishops != 0) {
+            int pos = lowestBitPosition(bishops);
+            evaluation.mgMaterial += BISHOP;
+            evaluation.mgPosition += BISHOP_TABLE[side][pos];
+            evaluation.egMaterial += BISHOP_EG;
+            evaluation.egPosition += BISHOP_TABLE[side][pos];
+            count += 1;
+            long mask = Moves.bishopMove(pos, pieces, own);
+            evaluation.mobility += bitCount(mask);
+            evaluation.mobility += 2 * bitCount(mask & ~attackMask);
+            mobilityMask |= mask;
+            bishops = nextLowestBit(bishops);
+        }
+        if (count > 1) {
+            evaluation.mgPosition += BISHOP_PAIR;
+            evaluation.egPosition += BISHOP_PAIR;
+        }
+        return mobilityMask;
+    }
+
+    private long evalRook(int side, Evaluation evaluation, long rooks, long open, long semi, long pieces, long own, long attackMask) {
+        long mobilityMask = 0;
+        long next = rooks;
+        while (next != 0) {
+            long piece = lowestBit(next);
+            int pos = lowestBitPosition(next);
+            evaluation.mgMaterial += ROOK;
+            evaluation.mgPosition += ROOK_TABLE[side][pos];
+            evaluation.egMaterial += ROOK_EG;
+            evaluation.egPosition += ROOK_TABLE[side][pos];
+            if ((piece & open) != 0) {
+                evaluation.mgPosition += ROOK_OPEN;
+                evaluation.egPosition += ROOK_OPEN;
+            } else if ((piece & semi) != 0) {
+                evaluation.mgPosition += ROOK_SEMI;
+                evaluation.egPosition += ROOK_SEMI;
+            }
+            long mask = Moves.rookMove(pos, pieces, own);
+            evaluation.mobility += bitCount(mask);
+            evaluation.mobility += 2 * bitCount(mask & ~attackMask);
+            mobilityMask |= mask;
+            next = nextLowestBit(next);
+        }
+        return mobilityMask;
+    }
+
+    private long evalQueen(int side, Evaluation evaluation, long queens, long open, long semi, long pieces, long own, long attackMask) {
+        long mobilityMask = 0;
+        long next = queens;
+        while (next != 0) {
+            long piece = lowestBit(next);
+            int pos = lowestBitPosition(next);
+            evaluation.mgMaterial += QUEEN;
+            evaluation.egMaterial += QUEEN_EG;
+            if ((piece & open) != 0) {
+                evaluation.mgPosition += QUEEN_OPEN;
+                evaluation.egPosition += QUEEN_OPEN;
+            } else if ((piece & semi) != 0) {
+                evaluation.mgPosition += QUEEN_SEMI;
+                evaluation.egPosition += QUEEN_SEMI;
+            }
+            long mask = Moves.queenMove(pos, pieces, own);
+            evaluation.mobility += bitCount(mask);
+            evaluation.mobility += 2 * bitCount(mask & ~attackMask);
+            mobilityMask |= mask;
+            next = nextLowestBit(next);
+        }
+        return mobilityMask;
+    }
+
+    final void evalKing(int side, Evaluation evaluation, long king, long castle, long pawns) {
+        int pos = lowestBitPosition(king);
+        evaluation.mgPosition += KING_OPENING[side][pos];
+        evaluation.egPosition += KING_ENDING[side][pos];
+        if (castle == 0) {
+            evaluation.mgDeffense -= bitCount(pawnShield(side, pos, pawns));
+        }
+    }
+
+    private long pawnShield(int side, int pos, long pawns) {
+        long shield = PAWN_PASSED_TABLE[side][pos];
+        long mask = side == OWN_SIDE ? northFill(shield & pawns) : southFill(shield & pawns);
+        return shield & ~mask;
+    }
+
+    private long se(long own) {
+        return (own & 0xfefefefefefefefeL) >>> 9;
+    }
+
+    private long sw(long own) {
+        return (own & 0x7f7f7f7f7f7f7f7fL) >>> 7;
+    }
+
+    private long ne(long own) {
+        return (own & 0xfefefefefefefefeL) << 7;
+    }
+
+    private long nw(long own) {
+        return (own & 0x7f7f7f7f7f7f7f7fL) << 9;
     }
 
     private int fileMask(int pos) {

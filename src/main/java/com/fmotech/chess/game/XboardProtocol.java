@@ -1,8 +1,10 @@
 package com.fmotech.chess.game;
 
+import com.fmotech.chess.ai.mediocre.OliThink;
+
 public class XboardProtocol {
 
     public static void execute() {
-        System.out.println("Not implemented");
+        OliThink.main();
     }
 }

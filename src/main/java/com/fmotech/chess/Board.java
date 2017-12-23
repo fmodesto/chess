@@ -1,5 +1,6 @@
 package com.fmotech.chess;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import static com.fmotech.chess.BitOperations.highInt;
@@ -243,6 +244,14 @@ public class Board {
         return b3 & b2 & b1 & CASTLE;
     }
 
+    public long rooksQueens() {
+        return rooks() | queens();
+    }
+
+    public long bishopsQueens() {
+        return bishops() | queens();
+    }
+
     // Own pieces
 
     public long ownPieces() {
@@ -380,5 +389,25 @@ public class Board {
         h1 ^= h0;  h0 = (h0 << 63) | (h0 >>> 1);   h1 += h0;
 
         return h0;
+    }
+
+    public void write(ByteBuffer buffer) {
+        buffer.putLong(ply);
+        buffer.putLong(b4);
+        buffer.putLong(b3);
+        buffer.putLong(b2);
+        buffer.putLong(b1);
+    }
+
+    public static Board read(ByteBuffer buffer) {
+        return Board.of(buffer.getLong(), buffer.getLong(), buffer.getLong(), buffer.getLong(), buffer.getLong());
+    }
+
+    public void load(ByteBuffer buffer) {
+        this.ply = buffer.getLong();
+        this.b4 = buffer.getLong();
+        this.b3 = buffer.getLong();
+        this.b2 = buffer.getLong();
+        this.b1 = buffer.getLong();
     }
 }

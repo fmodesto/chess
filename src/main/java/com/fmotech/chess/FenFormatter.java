@@ -21,11 +21,12 @@ public class FenFormatter {
     private static final String[] TO_PROMO = createToPromos();
 
     public static Board fromFen(String fen) {
-        String[] parts = normalizeSpace(fen).split("\\s+");
-        boolean whiteTurn = "w".equals(parts[1]);
+        int index = 0;
+        while (Character.isSpaceChar(fen.charAt(index))) index++;
         long b = 1L << 63;
         long pawns = 0, rooks = 0, knights = 0, bishops = 0, queens = 0, kings = 0, color = 0, castle = 0, enPassant = 0;
-        for (char c : parts[0].toCharArray()) {
+        while (!Character.isSpaceChar(fen.charAt(index))) {
+            char c = fen.charAt(index++);
             if (Character.isDigit(c)) {
                 b >>>= c - '0';
             } else if (c != '/') {
@@ -40,20 +41,42 @@ public class FenFormatter {
                 b >>>= 1;
             }
         }
-        for (char c : parts[2].toCharArray()) {
+        while (Character.isSpaceChar(fen.charAt(index))) index++;
+        boolean whiteTurn = 'w' == fen.charAt(index++);
+        while (Character.isSpaceChar(fen.charAt(index))) index++;
+        while (!Character.isSpaceChar(fen.charAt(index))) {
+            char c = fen.charAt(index++);
             if (c == 'K' && (kings & 1L << 3) != 0) castle |= 1L & rooks;
             if (c == 'Q' && (kings & 1L << 3) != 0) castle |= 1L << 7 & rooks;
             if (c == 'k' && (kings & 1L << 59) != 0) castle |= 1L << 56 & rooks;
             if (c == 'q' && (kings & 1L << 59) != 0) castle |= 1L << 63 & rooks;
         }
-        if (!"-".equals(parts[3])) {
-            int p = 8 * (parts[3].charAt(1) - '1') + (7 - (Character.toLowerCase(parts[3].charAt(0)) - 'a'));
+        while (Character.isSpaceChar(fen.charAt(index))) index++;
+        char c = fen.charAt(index++);
+        if (c != '-') {
+            char d = fen.charAt(index++);
+            int p = 8 * (d - '1') + (7 - (Character.toLowerCase(c) - 'a'));
             enPassant |= (1L << p) & (whiteTurn ? pawns << 8 : pawns >>> 8);
             if (whiteTurn) color |= enPassant;
         }
-        int ply = 2 * (Integer.parseInt(parts[5]) - 1);
-        int fifty = ply - Integer.parseInt(parts[4]) + (whiteTurn ? 0 : 1);
-
+        int ply = 0;
+        int fifty = 0;
+        if (fen.length() > index) {
+            while (Character.isSpaceChar(fen.charAt(index))) index++;
+            int x = 0;
+            while (fen.length() > index && Character.isDigit(fen.charAt(index))) {
+                x *= 10;
+                x += fen.charAt(index++) - '0';
+            }
+            while (Character.isSpaceChar(fen.charAt(index))) index++;
+            int y = 0;
+            while (fen.length() > index && Character.isDigit(fen.charAt(index))) {
+                y *= 10;
+                y += fen.charAt(index++) - '0';
+            }
+            ply = 2 * (y - 1);
+            fifty = ply - x + (whiteTurn ? 0 : 1);
+        }
         Board board = Board.of(ply, fifty, color, pawns, rooks, knights, bishops, queens, kings, enPassant, castle);
         return whiteTurn ? board : board.nextTurn();
     }

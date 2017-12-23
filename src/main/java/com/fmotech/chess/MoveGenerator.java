@@ -169,41 +169,62 @@ public class MoveGenerator {
     }
 
     private static int generateRooksMoves(Board board, long filter, int counter, int[] moves) {
+        long pieces = board.pieces();
+        long ownPieces = board.ownPieces();
         long rooks = board.ownRooks();
         while (rooks != 0) {
             int pos = lowestBitPosition(rooks);
-            long mask = generateLinearMoveFor(board, pos, ROOK_HIGH_TABLE, ROOK_LOW_TABLE);
+            long mask = generateRookMaks(pos, pieces, ownPieces);
             counter = createMove(moves, counter, board, pos, ROOK, mask & filter);
             rooks = nextLowestBit(rooks);
         }
         return counter;
     }
 
+    public static long generateRookMaks(int pos, long pieces, long ownPieces) {
+        return generateLinearMoveFor(pos, ROOK_HIGH_TABLE, ROOK_LOW_TABLE, pieces, ownPieces);
+    }
+
     private static int generateKnightMoves(Board board, int counter, int[] moves) {
         return generateTargetMoves(board, board.ownKnights(), ~board.ownPieces(), KNIGHT_TABLE, KNIGHT, counter, moves);
     }
 
+    public static long generateKnightMask(int pos, long pieces, long ownPieces) {
+        return KNIGHT_TABLE[pos] & ~ownPieces;
+    }
+
     private static int generateBishopsMoves(Board board, long filter, int counter, int[] moves) {
+        long pieces = board.pieces();
+        long ownPieces = board.ownPieces();
         long bishops = board.ownBishops();
         while (bishops != 0) {
             int pos = lowestBitPosition(bishops);
-            long mask = generateLinearMoveFor(board, pos, BISHOP_HIGH_TABLE, BISHOP_LOW_TABLE);
+            long mask = generateBishopMask(pos, pieces, ownPieces);
             counter = createMove(moves, counter, board, pos, BISHOP, mask & filter);
             bishops = nextLowestBit(bishops);
         }
         return counter;
     }
 
+    public static long generateBishopMask(int pos, long pieces, long ownPieces) {
+        return generateLinearMoveFor(pos, BISHOP_HIGH_TABLE, BISHOP_LOW_TABLE, pieces, ownPieces);
+    }
+
     private static int generateQueensMoves(Board board, long filter, int counter, int[] moves) {
+        long pieces = board.pieces();
+        long ownPieces = board.ownPieces();
         long queens = board.ownQueens();
         while (queens != 0) {
             int pos = lowestBitPosition(queens);
-            long mask = generateLinearMoveFor(board, pos, ROOK_HIGH_TABLE, ROOK_LOW_TABLE)
-                    | generateLinearMoveFor(board, pos, BISHOP_HIGH_TABLE, BISHOP_LOW_TABLE);
+            long mask = generateQueenMask(pos, pieces, ownPieces);
             counter = createMove(moves, counter, board, pos, QUEEN, mask & filter);
             queens = nextLowestBit(queens);
         }
         return counter;
+    }
+
+    public static long generateQueenMask(int pos, long pieces, long ownPieces) {
+        return generateRookMaks(pos, pieces, ownPieces) | generateBishopMask(pos, pieces, ownPieces);
     }
 
     private static int generateKingMoves(Board board, int counter, int[] moves) {
@@ -221,8 +242,11 @@ public class MoveGenerator {
         return counter;
     }
 
-    private static long generateLinearMoveFor(Board board, int pos, long[] highTable, long[] lowTable) {
-        long pieces = board.pieces();
+    public static long generateKingMask(int pos, long pieces, long ownPieces) {
+        return KING_TABLE[pos] & ~ownPieces;
+    }
+
+    private static long generateLinearMoveFor(int pos, long[] highTable, long[] lowTable, long pieces, long ownPieces) {
         long move = 0;
         long next = highTable[pos];
         move |= next;
@@ -232,7 +256,6 @@ public class MoveGenerator {
             int contactPos = lowestBitPosition(contact);
             long mask = ~highTable[contactPos];
             move &= mask;
-            if (board.own(contact)) move ^= contact;
             next &= mask;
             next = nextLowestBit(next);
         }
@@ -244,11 +267,10 @@ public class MoveGenerator {
             int contactPos = highestBitPosition(contact);
             long mask = ~lowTable[contactPos];
             move &= mask;
-            if (board.own(contact)) move ^= contact;
             next &= mask;
             next = nextHighestBit(next);
         }
-        return move;
+        return move & ~ownPieces;
     }
 
     private static int generateTargetMoves(Board board, long pieces, long filter, long[] table, int srcType, int counter, int[] moves) {
