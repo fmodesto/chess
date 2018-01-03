@@ -55,7 +55,7 @@ public class Game {
 //        System.out.println("\n");
         long initTime = System.currentTimeMillis();
 //        game.autoPly(-1, 7);
-        game.followPly(2000, 64, copy);
+        game.followPly(2000, 27, copy);
         double time = (System.currentTimeMillis() - initTime) / 1000D;
 //        System.out.println(AI.nodesNegamaxTotal + " nps " + (AI.nodesNegamaxTotal / time));
 //        System.out.println(AI.nodesQuiescenceTotal + " nps " + (AI.nodesQuiescenceTotal / time));

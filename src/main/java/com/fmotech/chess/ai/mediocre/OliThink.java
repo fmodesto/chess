@@ -1,5 +1,4 @@
-package com.fmotech.chess.ai.mediocre;/* OliThink5 Java(c) Oliver Brausch 04.Mar.2012, ob112@web.de, http://home.arcor.de/dreamlike */
-import com.fmotech.chess.BitOperations;
+package com.fmotech.chess.ai.mediocre;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -26,7 +25,9 @@ public class OliThink {
 	final static int pval[] = {0, 100, 290, 0, 100, 310, 500, 950};
 	final static int pawnrun[] = {0, 0, 1, 8, 16, 32, 64, 128};
 
-	static int FROM(int x) { return ((x) & 63); }
+    static long BIT(int i) { return 1L << i; }
+
+    static int FROM(int x) { return ((x) & 63); }
 	static int TO(int x) { return (((x) >> 6) & 63); }
 	static int PROM(int x) { return (((x) >> 12) & 7); }
 	static int PIECE(int x) { return (((x) >> 15) & 7); }
@@ -81,11 +82,11 @@ public class OliThink {
 	static long NCAP(int x, int c) { return (SHORTCAP(nmoves[x], (c))); }
 	static long KCAP(int x, int c) { return (SHORTCAP(kmoves[x], (c))); }
 	static long PCAP(int x, int c) { return (pcaps[(c)][(x)] & colorb[(c)^1]); }
-	static long PCA3(int x, int c) { return (pcaps[(c)][(x) | 64] & (colorb[(c)^1] | ((toBit(ENPASS())) & (c == 1 ? 0xFF0000L : 0xFF0000000000L)))); }
-	static long PCA4(int x, int c) { return (pcaps[(c)][(x) | 128] & (colorb[(c)^1] | ((toBit(ENPASS())) & (c == 1? 0xFF0000L : 0xFF0000000000L)))); }
+	static long PCA3(int x, int c) { return (pcaps[(c)][(x) | 64] & (colorb[(c)^1] | ((BIT(ENPASS())) & (c == 1 ? 0xFF0000L : 0xFF0000000000L)))); }
+	static long PCA4(int x, int c) { return (pcaps[(c)][(x) | 128] & (colorb[(c)^1] | ((BIT(ENPASS())) & (c == 1? 0xFF0000L : 0xFF0000000000L)))); }
 
 	static boolean RANK(int x, int y) { return (((x) & 0x38) == (y)); }
-	static boolean TEST(int f, long b) { return (toBit(f) & (b)) != 0; }
+	static boolean TEST(int f, long b) { return (BIT(f) & (b)) != 0; }
 	static int ENPASS() { return (flags & 63); }
 	static int CASTLE() { return (flags & 960); }
 	static int COUNT() { return (count & 0x3FF); }
@@ -111,7 +112,6 @@ public class OliThink {
 	final static long[] kmoves = new long[64];
 	final static int[] _knight = {-17,-10,6,15,17,10,-6,-15};
 	final static int[] _king = {-9,-1,7,8,9,1,-7,-8};
-	final static long[] BIT = new long[64];
 	final static int[] crevoke = new int[64];
 	final static int[] nmobil = new int[64];
 	final static int[] kmobil = new int[64];
@@ -186,18 +186,18 @@ public class OliThink {
 				if (p == KING) kingpos[c] = row*8 + col;
 				else mat += c == 1 ? -pval[p] : pval[p];
 				hashb ^= hashxor[col | row << 3 | i << 6 | (c == 1 ? 512 : 0)];
-				pieceb[p] |= toBit(row*8 + col);
-				colorb[c] |= toBit(row*8 + (col++));
+				pieceb[p] |= BIT(row*8 + col);
+				colorb[c] |= BIT(row*8 + (col++));
 			}
 		}
 		onmove = mv == 'b' ? 1 : 0;
 		flags = i = 0;
 		for (i = 0; i < cas.length(); i++) {
 			s = cas.charAt(i);
-			if (s == 'K') flags |= toBit(6);
-			if (s == 'k') flags |= toBit(7);
-			if (s == 'Q') flags |= toBit(8);
-			if (s == 'q') flags |= toBit(9);
+			if (s == 'K') flags |= BIT(6);
+			if (s == 'k') flags |= BIT(7);
+			if (s == 'Q') flags |= BIT(8);
+			if (s == 'q') flags |= BIT(9);
 		}
 		if (enps.charAt(0) >= 'a' && enps.charAt(0) <= 'h' && enps.charAt(1) >= '1' && enps.charAt(1) <= '8') flags |= 8*(enps.charAt(1) - '1') + enps.charAt(0) - 'a';
 		count = (fullm - 1)*2 + onmove + (halfm << 10);
@@ -290,13 +290,14 @@ public class OliThink {
 	}
 
 	static byte getLsb(long bm) {
-		return (byte) BitOperations.lowestBitPosition(bm);
+		return (byte) Long.numberOfTrailingZeros(bm);
 	}
 
 	static byte _bitcnt(long bit) {
-		byte c = 0;
-		while (bit != 0) { bit &= (bit - 1); c++; }
-		return c;
+//		byte c = 0;
+//		while (bit != 0) { bit &= (bit - 1); c++; }
+//		return c;
+        return bitcnt(bit);
 	}
 
 	static byte bitcnt (long n) {
@@ -375,25 +376,25 @@ public class OliThink {
 				int dfile = (jfile - file)*(jfile - file);
 				if (dfile > 1) continue;
 				if ((c == 1 && jrank < rank) || (c == 0 && jrank > rank)) {//The not touched half of the pawn
-					if (dfile == 0) filep[i] |= toBit(j);
-					freep[i] |= toBit(j);
+					if (dfile == 0) filep[i] |= BIT(j);
+					freep[i] |= BIT(j);
 				} else if (dfile != 0 && (jrank - rank)*(jrank - rank) <= 1) {
-					helpp[i] |= toBit(j);
+					helpp[i] |= BIT(j);
 				}
 			}
 			if (m < 0 || m > 63) continue;
-			moves[i] |= toBit(m);
+			moves[i] |= BIT(m);
 			if (file > 0) {
 				m = i + (c == 1 ? -9 : 7);
 				if (m < 0 || m > 63) continue;
-				caps[i] |= toBit(m);
-				caps[i + 64*(2 - c)] |= toBit(m);
+				caps[i] |= BIT(m);
+				caps[i + 64*(2 - c)] |= BIT(m);
 			}
 			if (file < 7) {
 				m = i + (c == 1 ? -7 : 9);
 				if (m < 0 || m > 63) continue;
-				caps[i] |= toBit(m);
-				caps[i + 64*(c + 1)] |= toBit(m);
+				caps[i] |= BIT(m);
+				caps[i + 64*(c + 1)] |= BIT(m);
 			}
 		}
 	}
@@ -404,7 +405,7 @@ public class OliThink {
 			for (j = 0; j < 8; j++) {
 				n = i + m[j];
 				if (n < 64 && n >= 0 && ((n & 7)-(i & 7))*((n & 7)-(i & 7)) <= 4) {
-					moves[i] |= toBit(n);
+					moves[i] |= BIT(n);
 				}
 			}
 		}
@@ -427,7 +428,7 @@ public class OliThink {
 		Method rayFunc = c.getDeclaredMethod(srayf, int.class, long.class, int.class);
 		Method key = c.getDeclaredMethod(skey, long.class, int.class);
 		for (f = 0; f < 64; f++) {
-			mmask = (Long) rayFunc.invoke(c, f, 0L, 0) | toBit(f);
+			mmask = (Long) rayFunc.invoke(c, f, 0L, 0) | BIT(f);
 			iperm = 1 << (bc = bitcnt(mmask));
 			for (i = 0; i < iperm; i++) {
 				board = _occ_free_board(bc, i, mmask);
@@ -445,12 +446,12 @@ public class OliThink {
 		long free = 0L, occ = 0L, xray = 0L;
 		int i, b;
 		for (b = 0, i = f+1; i < 64 && i%8 != 0; i++) {
-			if (TEST(i, board)) { if (b != 0) { xray |= toBit(i); break; } else { occ |= toBit(i); b = 1; }}
-			if (b == 0) free |= toBit(i);
+			if (TEST(i, board)) { if (b != 0) { xray |= BIT(i); break; } else { occ |= BIT(i); b = 1; }}
+			if (b == 0) free |= BIT(i);
 		}
 		for (b = 0, i = f-1; i >= 0 && i%8 != 7; i--) {
-			if (TEST(i, board)) { if (b != 0) { xray |= toBit(i); break; } else { occ |= toBit(i); b = 1; }}
-			if (b == 0) free |= toBit(i);
+			if (TEST(i, board)) { if (b != 0) { xray |= BIT(i); break; } else { occ |= BIT(i); b = 1; }}
+			if (b == 0) free |= BIT(i);
 		}
 		return (t < 2) ? free : (t == 2 ? occ : xray);
 	}
@@ -459,12 +460,12 @@ public class OliThink {
 		long free = 0L, occ = 0L, xray = 0L;
 		int i, b;
 		for (b = 0, i = f-8; i >= 0; i-=8) {
-			if (TEST(i, board)) { if (b != 0) { xray |= toBit(i); break; } else { occ |= toBit(i); b = 1; }}
-			if (b == 0) free |= toBit(i);
+			if (TEST(i, board)) { if (b != 0) { xray |= BIT(i); break; } else { occ |= BIT(i); b = 1; }}
+			if (b == 0) free |= BIT(i);
 		}
 		for (b = 0, i = f+8; i < 64; i+=8) {
-			if (TEST(i, board)) { if (b != 0) { xray |= toBit(i); break; } else { occ |= toBit(i); b = 1; }}
-			if (b == 0) free |= toBit(i);
+			if (TEST(i, board)) { if (b != 0) { xray |= BIT(i); break; } else { occ |= BIT(i); b = 1; }}
+			if (b == 0) free |= BIT(i);
 		}
 		return (t < 2) ? free : (t == 2 ? occ : xray);
 	}
@@ -473,12 +474,12 @@ public class OliThink {
 		long free = 0L, occ = 0L, xray = 0L;
 		int i, b;
 		for (b = 0, i = f+9; i < 64 && (i%8 != 0); i+=9) {
-			if (TEST(i, board)) { if (b != 0) { xray |= toBit(i); break; } else { occ |= toBit(i); b = 1; }}
-			if (b == 0) free |= toBit(i);
+			if (TEST(i, board)) { if (b != 0) { xray |= BIT(i); break; } else { occ |= BIT(i); b = 1; }}
+			if (b == 0) free |= BIT(i);
 		}
 		for (b = 0, i = f-9; i >= 0 && (i%8 != 7); i-=9) {
-			if (TEST(i, board)) { if (b != 0) { xray |= toBit(i); break; } else { occ |= toBit(i); b = 1; }}
-			if (b == 0) free |= toBit(i);
+			if (TEST(i, board)) { if (b != 0) { xray |= BIT(i); break; } else { occ |= BIT(i); b = 1; }}
+			if (b == 0) free |= BIT(i);
 		}
 		return (t < 2) ? free : (t == 2 ? occ : xray);
 	}
@@ -487,12 +488,12 @@ public class OliThink {
 		long free = 0L, occ = 0L, xray = 0L;
 		int i, b;
 		for (b = 0, i = f-7; i >= 0 && (i%8 != 0); i-=7) {
-			if (TEST(i, board)) { if (b != 0) { xray |= toBit(i); break; } else { occ |= toBit(i); b = 1; }}
-			if (b == 0) free |= toBit(i);
+			if (TEST(i, board)) { if (b != 0) { xray |= BIT(i); break; } else { occ |= BIT(i); b = 1; }}
+			if (b == 0) free |= BIT(i);
 		}
 		for (b = 0, i = f+7; i < 64 && (i%8 != 7); i+=7) {
-			if (TEST(i, board)) { if (b != 0) { xray |= toBit(i); break; } else { occ |= toBit(i); b = 1; }}
-			if (b == 0) free |= toBit(i);
+			if (TEST(i, board)) { if (b != 0) { xray |= BIT(i); break; } else { occ |= BIT(i); b = 1; }}
+			if (b == 0) free |= BIT(i);
 		}
 		return (t < 2) ? free : (t == 2 ? occ : xray);
 	}
@@ -555,13 +556,13 @@ public class OliThink {
 		long b = ((RXRAY1(f) | RXRAY2(f)) & colorb[oc]) & RQU();
 		while (b != 0) {
 			int t = getLsb(b);
-			b ^= toBit(t);
+			b ^= BIT(t);
 			pin |= RCAP(t, oc) & ROCC(f);
 		}
 		b = ((BXRAY3(f) | BXRAY4(f)) & colorb[oc]) & BQU();
 		while (b != 0) {
 			int t = getLsb(b);
-			b ^= toBit(t);
+			b ^= BIT(t);
 			pin |= BCAP(t, oc) & BOCC(f);
 		}
 		return pin;
@@ -580,11 +581,11 @@ public class OliThink {
 		int p = PIECE(m);
 		int a = CAP(m);
 
-		colorb[c] ^= toBit(f);
-		pieceb[p] ^= toBit(f);
+		colorb[c] ^= BIT(f);
+		pieceb[p] ^= BIT(f);
 
-		colorb[c] ^= toBit(t);
-		pieceb[p] ^= toBit(t);
+		colorb[c] ^= BIT(t);
+		pieceb[p] ^= BIT(t);
 		hashb ^= hashxor[(f) | (p) << 6 | (c) << 9];
 		hashb ^= hashxor[(t) | (p) << 6 | (c) << 9];
 
@@ -597,8 +598,8 @@ public class OliThink {
 			} else if (a == ROOK && CASTLE() != 0) { //Revoke castling rights.
 				flags &= crevoke[t];
 			}
-			pieceb[a] ^= toBit(t);
-			colorb[c^1] ^= toBit(t);
+			pieceb[a] ^= BIT(t);
+			colorb[c^1] ^= BIT(t);
 			hashb ^= hashxor[(t) | (a) << 6 | (c^1) << 9];
 			count &= 0x3FF; //Reset Fifty Counter
 			mat += c == 1 ? -pval[a] : +pval[a];
@@ -606,8 +607,8 @@ public class OliThink {
 		if (p == PAWN) {
 			if (((f^t)&8) == 0) flags |= f^24; //Enpassant
 			else if ((t&56) == 0 || (t&56) == 56) {
-				pieceb[PAWN] ^= toBit(t);
-				pieceb[PROM(m)] ^= toBit(t);
+				pieceb[PAWN] ^= BIT(t);
+				pieceb[PROM(m)] ^= BIT(t);
 				hashb ^= hashxor[(t) | (PAWN) << 6 | (c) << 9];
 				hashb ^= hashxor[(t) | (PROM(m)) << 6 | (c) << 9];
 				mat += c == 1 ? pval[PAWN] - pval[PROM(m)] : -pval[PAWN] + pval[PROM(m)];
@@ -621,10 +622,10 @@ public class OliThink {
 				else if (t == 2) { f = 0; t = 3; }
 				else if (t == 62) { f = 63; t = 61; }
 				else { f = 56; t = 59; }
-				colorb[c] ^= toBit(f);
-				pieceb[ROOK] ^= toBit(f);
-				colorb[c] ^= toBit(t);
-				pieceb[ROOK] ^= toBit(t);
+				colorb[c] ^= BIT(f);
+				pieceb[ROOK] ^= BIT(f);
+				colorb[c] ^= BIT(t);
+				pieceb[ROOK] ^= BIT(t);
 				hashb ^= hashxor[(f) | (ROOK) << 6 | (c) << 9];
 				hashb ^= hashxor[(t) | (ROOK) << 6 | (c) << 9];
 			}
@@ -649,7 +650,7 @@ public class OliThink {
 	static void regMoves(int m, long bt, int[] mlist, int[] mn, int cap) {
 		while (bt != 0) {
 			int t = getLsb(bt);
-			bt ^= toBit(t);
+			bt ^= BIT(t);
 			mlist[mn[0]++] = m | _TO(t) | (cap != 0 ? _CAP(identPiece(t)) : 0);
 		}
 	}
@@ -662,7 +663,7 @@ public class OliThink {
 	static void regPromotions(int f, int c, long bt, int[] mlist, int[] mn, int cap, int queen) {
 		while (bt != 0) {
 			int t = getLsb(bt);
-			bt ^= toBit(t);
+			bt ^= BIT(t);
 			int m = f | _ONMV(c) | _PIECE(PAWN) | _TO(t) | (cap != 0 ? _CAP(identPiece(t)) : 0);
 			if (queen != 0) mlist[mn[0]++] = m | _PROM(QUEEN);
 			mlist[mn[0]++] = m | _PROM(KNIGHT);
@@ -674,7 +675,7 @@ public class OliThink {
 	static void regKings(int m, long bt, int[] mlist, int[] mn, int c, int cap) {
 		while (bt != 0) {
 			int t = getLsb(bt);
-			bt ^= toBit(t);
+			bt ^= BIT(t);
 			if (battacked(t, c)) continue;
 			mlist[mn[0]++] = m | _TO(t) | (cap != 0 ? _CAP(identPiece(t)) : 0);
 		}
@@ -683,17 +684,17 @@ public class OliThink {
 	static int generateCheckEsc(long ch, long apin, int c, int k, int[] ml, int[] mn) {
 		long cc, fl;
 		int d, bf = _bitcnt(ch);
-		colorb[c] ^= toBit(k);
+		colorb[c] ^= BIT(k);
 		regKings(PREMOVE(k, KING, c), KCAP(k, c), ml, mn, c, 1);
 		regKings(PREMOVE(k, KING, c), KMOVE(k), ml, mn, c, 0);
-		colorb[c] ^= toBit(k);
+		colorb[c] ^= BIT(k);
 		if (bf > 1) return bf; //Doublecheck
 		bf = getLsb(ch);
 
 		cc = attacked(bf, c^1) & apin;  //Can we capture the checker?
 		while (cc != 0) {
 			int cf = getLsb(cc);
-			cc ^= toBit(cf);
+			cc ^= BIT(cf);
 			int p = identPiece(cf);
 			if (p == PAWN && RANK(cf, c != 0 ? 0x08 : 0x30)) {
 				regPromotions(cf, c, ch, ml, mn, 1, 1);
@@ -705,8 +706,8 @@ public class OliThink {
 			cc = PCAP(ENPASS(), c^1) & pieceb[PAWN] & apin;
 			while (cc != 0) {
 				int cf = getLsb(cc);
-				cc ^= toBit(cf);
-				regMovesCaps(PREMOVE(cf, PAWN, c), toBit(ENPASS()), 0L, ml, mn);
+				cc ^= BIT(cf);
+				regMovesCaps(PREMOVE(cf, PAWN, c), BIT(ENPASS()), 0L, ml, mn);
 			}
 		}
 		if ((ch & (nmoves[k] | kmoves[k])) != 0) return 1; //We can't move anything between!
@@ -719,24 +720,24 @@ public class OliThink {
 
 		while (fl != 0) {
 			int f = getLsb(fl);
-			fl ^= toBit(f);
+			fl ^= BIT(f);
 			cc = reach(f, c^1) & apin;
 			while (cc != 0) {
 				int cf = getLsb(cc);
-				cc ^= toBit(cf);
+				cc ^= BIT(cf);
 				int p = identPiece(cf);
-				regMovesCaps(PREMOVE(cf, p, c), 0L, toBit(f), ml, mn);
+				regMovesCaps(PREMOVE(cf, p, c), 0L, BIT(f), ml, mn);
 			}
 			bf = c != 0 ? f+8 : f-8;
 			if (bf < 0 || bf > 63) continue;
-			if ((toBit(bf) & pieceb[PAWN] & colorb[c] & apin) != 0) {
+			if ((BIT(bf) & pieceb[PAWN] & colorb[c] & apin) != 0) {
 				if (RANK(bf, c != 0 ? 0x08 : 0x30))
-					regPromotions(bf, c, toBit(f), ml, mn, 0, 1);
+					regPromotions(bf, c, BIT(f), ml, mn, 0, 1);
 				else
-					regMovesCaps(PREMOVE(bf, PAWN, c), 0L, toBit(f), ml, mn);
+					regMovesCaps(PREMOVE(bf, PAWN, c), 0L, BIT(f), ml, mn);
 			}
-			if (RANK(f, c != 0 ? 0x20 : 0x18) && (BOARD() & toBit(bf)) == 0 && (toBit(c != 0 ? f+16 : f-16) & pieceb[PAWN] & colorb[c] & apin) != 0)
-				regMovesCaps(PREMOVE(c != 0 ? f+16 : f-16, PAWN, c), 0L, toBit(f), ml, mn);
+			if (RANK(f, c != 0 ? 0x20 : 0x18) && (BOARD() & BIT(bf)) == 0 && (BIT(c != 0 ? f+16 : f-16) & pieceb[PAWN] & colorb[c] & apin) != 0)
+				regMovesCaps(PREMOVE(c != 0 ? f+16 : f-16, PAWN, c), 0L, BIT(f), ml, mn);
 		}
 		return 1;
 	}
@@ -750,7 +751,7 @@ public class OliThink {
 		b = pieceb[PAWN] & cb;
 		while (b != 0) {
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			m = PMOVE(f, c);
 			if (m != 0 && RANK(f, c != 0 ? 0x30 : 0x08)) m |= PMOVE(c != 0 ? f-8 : f+8, c);
 			if (RANK(f, c != 0 ? 0x08 : 0x30)) {
@@ -765,7 +766,7 @@ public class OliThink {
 		b = pin & pieceb[PAWN];
 		while (b != 0) {
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			t = getDir(f, kingpos[c]);
 			if ((t & 8) != 0) continue;
 			m = 0L;
@@ -785,26 +786,26 @@ public class OliThink {
 		b = pieceb[KNIGHT] & cb;
 		while (b != 0) {
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			regMoves(PREMOVE(f, KNIGHT, c), NMOVE(f), ml, mn, 0);
 		}
 
 		b = pieceb[ROOK] & cb;
 		while (b != 0) {
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			regMoves(PREMOVE(f, ROOK, c), RMOVE(f), ml, mn, 0);
 			if (CASTLE() != 0 && ch == 0) {
 				if (c != 0) {
-					if ((flags & 128) != 0 && (f == 63) && (RMOVE1(63) & toBit(61)) != 0)
-						if (!DUALATT(61, 62, c)) regMoves(PREMOVE(60, KING, c), toBit(62), ml, mn, 0);
-					if ((flags & 512) != 0 && (f == 56) && (RMOVE1(56) & toBit(59)) != 0)
-						if (!DUALATT(59, 58, c)) regMoves(PREMOVE(60, KING, c), toBit(58), ml, mn, 0);
+					if ((flags & 128) != 0 && (f == 63) && (RMOVE1(63) & BIT(61)) != 0)
+						if (!DUALATT(61, 62, c)) regMoves(PREMOVE(60, KING, c), BIT(62), ml, mn, 0);
+					if ((flags & 512) != 0 && (f == 56) && (RMOVE1(56) & BIT(59)) != 0)
+						if (!DUALATT(59, 58, c)) regMoves(PREMOVE(60, KING, c), BIT(58), ml, mn, 0);
 				} else {
-					if ((flags & 64) != 0 && (f == 7) && (RMOVE1(7) & toBit(5)) != 0)
-						if (!DUALATT(5, 6, c)) regMoves(PREMOVE(4, KING, c), toBit(6), ml, mn, 0);
-					if ((flags & 256) != 0 && (f == 0) && (RMOVE1(0) & toBit(3)) != 0)
-						if (!DUALATT(3, 2, c)) regMoves(PREMOVE(4, KING, c), toBit(2), ml, mn, 0);
+					if ((flags & 64) != 0 && (f == 7) && (RMOVE1(7) & BIT(5)) != 0)
+						if (!DUALATT(5, 6, c)) regMoves(PREMOVE(4, KING, c), BIT(6), ml, mn, 0);
+					if ((flags & 256) != 0 && (f == 0) && (RMOVE1(0) & BIT(3)) != 0)
+						if (!DUALATT(3, 2, c)) regMoves(PREMOVE(4, KING, c), BIT(2), ml, mn, 0);
 				}
 			}
 		}
@@ -812,14 +813,14 @@ public class OliThink {
 		b = pieceb[BISHOP] & cb;
 		while (b != 0) {
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			regMoves(PREMOVE(f, BISHOP, c), BMOVE(f), ml, mn, 0);
 		}
 
 		b = pieceb[QUEEN] & cb;
 		while (b != 0) {
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			regMoves(PREMOVE(f, QUEEN, c), RMOVE(f) | BMOVE(f), ml, mn, 0);
 		}
 
@@ -827,7 +828,7 @@ public class OliThink {
 		while (b != 0) {
 			int p;
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			p = identPiece(f);
 			t = p | getDir(f, kingpos[c]);
 			if ((t & 10) == 10) regMoves(PREMOVE(f, p, c), RMOVE1(f), ml, mn, 0);
@@ -847,20 +848,20 @@ public class OliThink {
 		b = pieceb[PAWN] & cb;
 		while (b != 0) {
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			a = PCAP(f, c);
 			if (RANK(f, c != 0 ? 0x08 : 0x30)) {
 				regMovesCaps(PREMOVE(f, PAWN, c) | _PROM(QUEEN), a, PMOVE(f, c), ml, mn);
 			} else {
-				if (ENPASS() != 0 && (toBit(ENPASS()) & pcaps[(c)][(f)]) != 0) {
+				if (ENPASS() != 0 && (BIT(ENPASS()) & pcaps[(c)][(f)]) != 0) {
 					long hh;
 					int clbd = ENPASS()^8;
-					colorb[c^1] ^= toBit(clbd);
+					colorb[c^1] ^= BIT(clbd);
 					hh = ROCC1(f);
-					if ((hh & toBit(kingpos[c])) == 0 || (hh & colorb[c^1] & RQU()) == 0) {
-						a = a | toBit(ENPASS());
+					if ((hh & BIT(kingpos[c])) == 0 || (hh & colorb[c^1] & RQU()) == 0) {
+						a = a | BIT(ENPASS());
 					}
-					colorb[c^1] ^= toBit(clbd);
+					colorb[c^1] ^= BIT(clbd);
 				}
 				regMoves(PREMOVE(f, PAWN, c), a, ml, mn, 1);
 			}
@@ -869,7 +870,7 @@ public class OliThink {
 		b = pin & pieceb[PAWN];
 		while (b != 0) {
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			t = getDir(f, kingpos[c]);
 			if ((t & 8) != 0) continue;
 			m = a = 0L;
@@ -890,28 +891,28 @@ public class OliThink {
 		b = pieceb[KNIGHT] & cb;
 		while (b != 0) {
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			regMoves(PREMOVE(f, KNIGHT, c), NCAP(f, c), ml, mn, 1);
 		}
 
 		b = pieceb[BISHOP] & cb;
 		while (b != 0) {
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			regMoves(PREMOVE(f, BISHOP, c), BCAP(f, c), ml, mn, 1);
 		}
 
 		b = pieceb[ROOK] & cb;
 		while (b != 0) {
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			regMoves(PREMOVE(f, ROOK, c), RCAP(f, c), ml, mn, 1);
 		}
 
 		b = pieceb[QUEEN] & cb;
 		while (b != 0) {
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			regMoves(PREMOVE(f, QUEEN, c), RCAP(f, c) | BCAP(f,c), ml, mn, 1);
 		}
 
@@ -919,7 +920,7 @@ public class OliThink {
 		while (b != 0) {
 			int p;
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			p = identPiece(f);
 			t = p | getDir(f, kingpos[c]);
 			if ((t & 10) == 10) regMoves(PREMOVE(f, p, c), RCAP1(f, c), ml, mn, 1);
@@ -958,7 +959,7 @@ public class OliThink {
 	  attacks = attacked(t, 0) | attacked(t, 1);
 	  s_list[0] = a_piece;
 	  a_piece = pval[piece];
-	  colorb[onmv] ^= toBit(f);
+	  colorb[onmv] ^= BIT(f);
 	  if ((piece & 4) != 0 || piece == 1) {
 		int d = getDir(f, t);
 	    if (d == 32 || d == 64) attacks |= BOCC(t) & BQU();
@@ -1051,12 +1052,12 @@ public class OliThink {
 		while (b != 0) {
 			int ppos = 0;
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			ppos = pawnprg[c][f];
 			m = PMOVE(f, c);
 			a = POCC(f, c);
 			if ((a & kn) != 0) katt += _bitcnt(a & kn) << 4;
-			if ((toBit(f) & pin) != 0) {
+			if ((BIT(f) & pin) != 0) {
 				if ((getDir(f, kingpos[c]) & 16) == 0) m = 0;
 			} else {
 				ppos += _bitcnt(a & pieceb[PAWN] & colorb[c]) << 2;
@@ -1075,7 +1076,7 @@ public class OliThink {
 		while (b != 0) {
 			sf[0] += 1;
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			a = nmoves[f];
 			if ((a & kn) != 0) katt += _bitcnt(a & kn) << 4;
 			mn += nmobil[f];
@@ -1085,17 +1086,17 @@ public class OliThink {
 		while (b != 0) {
 			sf[0] += 1;
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			a = nmoves[f];
 			if ((a & kn) != 0) katt += _bitcnt(a & kn) << 4;
 		}
 
-		colorb[oc] ^= toBit(kingpos[oc]); //Opposite King doesn't block mobility at all
+		colorb[oc] ^= BIT(kingpos[oc]); //Opposite King doesn't block mobility at all
 		b = pieceb[QUEEN] & cb;
 		while (b != 0) {
 			sf[0] += 4;
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			a = RATT1(f) | RATT2(f) | BATT3(f) | BATT4(f);
 			if ((a & kn) != 0) katt += _bitcnt(a & kn) << 4;
 			mn += bitcnt(a);
@@ -1106,7 +1107,7 @@ public class OliThink {
 		while (b != 0) {
 			sf[0] += 1;
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			a = BATT3(f) | BATT4(f);
 			if ((a & kn) != 0) katt += _bitcnt(a & kn) << 4;
 			mn += bitcnt(a) << 3;
@@ -1118,7 +1119,7 @@ public class OliThink {
 		while (b != 0) {
 			sf[0] += 2;
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			a = RATT1(f) | RATT2(f);
 			if ((a & kn) != 0) katt += _bitcnt(a & kn) << 4;
 			mn += bitcnt(a) << 2;
@@ -1128,7 +1129,7 @@ public class OliThink {
 		b = pin & (pieceb[ROOK] | pieceb[BISHOP] | pieceb[QUEEN]);
 		while (b != 0) {
 			f = getLsb(b);
-			b ^= toBit(f);
+			b ^= BIT(f);
 			int p = identPiece(f);
 			if (p == BISHOP) {
 				sf[0] += 1;
@@ -1151,7 +1152,7 @@ public class OliThink {
 		}
 
 		colorb[oc] ^= pieceb[QUEEN] & ocb; //Back
-		colorb[oc] ^= toBit(kingpos[oc]); //Back
+		colorb[oc] ^= BIT(kingpos[oc]); //Back
 		if (sf[0] == 1 && (pieceb[PAWN] & colorb[c]) == 0) mn =- 200; //No mating material
 		if (sf[0] < 7) katt = katt * sf[0] / 7; //Reduce the bonus for attacking king squares
 	    if (sf[0] < 2) sf[0] = 2;
@@ -1159,9 +1160,10 @@ public class OliThink {
 	}
 
 	static int eval1 = 0;
+    static int[] sfp = new int[1];
 	static int eval(int c) {
 		int sf0 = 0, sf1 = 0;
-		int[] sfp = new int[]{sf0};
+		sfp[0] = sf0;
 		int ev0 = evalc(0, sfp);
 		sf0 = sfp[0];
 		sfp[0] = sf1;
@@ -1182,15 +1184,16 @@ public class OliThink {
 		int cmat = c == 1 ? -mat: mat;
 		if (ply == 63) return eval(c) + cmat;
 
-		if (ch == 0) do {
+		if (ch == 0) {
 			if (cmat - 200 >= beta) return beta;
-			if (cmat + 200 <= alpha) break;
-			best = eval(c) + cmat;
-			if (best > alpha) {
-				alpha = best;
-				if (best >= beta) return beta;
+			if (cmat + 200 > alpha) {
+				best = eval(c) + cmat;
+				if (best > alpha) {
+					alpha = best;
+					if (best >= beta) return beta;
+				}
 			}
-		} while(false);
+		}
 
 		generate(ch, c, ply, 1, 0);
 		if (ch != 0 && movenum[ply] == 0) return -32000 + ply;
@@ -1254,9 +1257,9 @@ public class OliThink {
 	static long HASHP(int c) { return (hashb ^ hashxor[flags | 1024 | (c << 11)]); }
 	static long HASHB(int c, int d) { return ((hashb ^ hashxor[flags | 1024]) ^ hashxor[c | (d << 1) | 2048]); }
 	static int search(long ch, int c, int d, int ply, int alpha, int beta, int pvnode, int isnull) {
-		int i, j, n, w, asave, first, best;
-		int hmove;
-		long hb, hp, he;
+//		int i, j, n, w, asave, first, best;
+//		int hmove;
+//		long hb, hp, he;
 
 		pvlength[ply] = ply;
 		if (ply == 63) return eval(c) + (c != 0 ? -mat: mat);
@@ -1267,16 +1270,17 @@ public class OliThink {
 		}
 		if (sabort) return 0;
 
-		hp = HASHP(c);
+		long hp = HASHP(c);
 		if (ply != 0 && isDraw(hp, 1) != 0) return 0;
 
 		if (d == 0) return quiesce(ch, c, ply, alpha, beta);
 		hstack[COUNT()] = hp;
 
-		hb = HASHB(c, d);
-		he = hashDB[(int)(hb & HMASKB)];
+		long hb = HASHB(c, d);
+		long he = hashDB[(int)(hb & HMASKB)];
+		int w;
 		if (((he^hb) & HINVB) == 0) {
-			w = (int)LOW16(he) - 32768;
+			w = LOW16(he) - 32768;
 			if ((he & 0x10000) != 0) {
 				isnull = 0;
 				if (w <= alpha) return alpha;
@@ -1302,7 +1306,7 @@ public class OliThink {
 			}
 		}
 
-		hmove = 0;
+		int hmove = 0;
 		if (ply > 0) {
 			he = hashDP[(int)(hp & HMASKP)];
 			if (((he^hp) & HINVP) == 0) hmove = (int)(he & HMASKP);
@@ -1316,10 +1320,10 @@ public class OliThink {
 			hmove = retPVMove(c, ply);
 		}
 
-		best = pvnode != 0 ? alpha : -32001;
-		asave = alpha;
-		first = 1;
-		for (n = 1; n <= ((ch != 0L) ? 2 : 3); n++) {
+		int best = pvnode != 0 ? alpha : -32001;
+		int asave = alpha;
+		int first = 1;
+		for (int n = 1; n <= ((ch != 0L) ? 2 : 3); n++) {
             if (n == 1) {
                 if (hmove == 0) continue;
                 movenum[ply] = 1;
@@ -1328,7 +1332,7 @@ public class OliThink {
             } else {
                 generate(ch, c, ply, 0, 1);
             }
-            for (i = 0; i < movenum[ply]; i++) {
+            for (int i = 0; i < movenum[ply]; i++) {
                 int m;
                 long nch;
                 int ext = 0;
@@ -1374,7 +1378,7 @@ public class OliThink {
 				}
 				if (pvnode != 0 && w >= alpha) {
 					pv[ply][ply] = m;
-					for (j = ply +1; j < pvlength[ply +1]; j++) pv[ply][j] = pv[ply +1][j];
+					for (int j = ply +1; j < pvlength[ply +1]; j++) pv[ply][j] = pv[ply +1][j];
 					pvlength[ply] = pvlength[ply +1];
 					if (ply == 0 && iter > 1 && w > value[iter-1] - 20) noabort = false;
 					if (w == 31999 - ply) return w;
@@ -1681,19 +1685,18 @@ public class OliThink {
 		for (i = 0; i < 4096; i++) hashxor[i] = _rand_64();
 		for (i = 0; i < HSIZEB; i++) hashDB[i] = 0L;
 		for (i = 0; i < HSIZEP; i++) hashDP[i] = 0L;
-		for (i = 0; i < 64; i++) BIT[i] = 1L << i;
 		for (i = 0; i < 64; i++) pmoves[0][i] = pawnfree[0][i] = pawnfile[0][i] = pawnhelp[0][i] = 0L;
 		for (i = 0; i < 192; i++) pcaps[0][i] = 0L;
 		for (i = 0; i < 64; i++) pmoves[1][i] = pawnfree[1][i] = pawnfile[1][i] = pawnhelp[1][i] = 0L;
 		for (i = 0; i < 192; i++) pcaps[1][i] = 0L;
-		for (i = 0; i < 64; i++) bmask45[i] = _bishop45(i, 0L, 0) | toBit(i);
-		for (i = 0; i < 64; i++) bmask135[i] = _bishop135(i, 0L, 0) | toBit(i);
+		for (i = 0; i < 64; i++) bmask45[i] = _bishop45(i, 0L, 0) | BIT(i);
+		for (i = 0; i < 64; i++) bmask135[i] = _bishop135(i, 0L, 0) | BIT(i);
 		for (i = 0; i < 64; i++) crevoke[i] = 0x3FF;
 		for (i = 0; i < 64; i++) kmoves[i] = nmoves[i] = 0L;
-		crevoke[7] ^= toBit(6);
-		crevoke[63] ^= toBit(7);
-		crevoke[0] ^= toBit(8);
-		crevoke[56] ^= toBit(9);
+		crevoke[7] ^= BIT(6);
+		crevoke[63] ^= BIT(7);
+		crevoke[0] ^= BIT(8);
+		crevoke[56] ^= BIT(9);
 
 		try {
 			_init_rays(0, otclass, "_rook0", "key000");
@@ -1733,31 +1736,4 @@ public class OliThink {
 		} catch (AccessControlException e) {
 		}
 	}
-
-	private static long toBit(int i) {
-		return 1L << i;
-	}
 }
-/*
-xboard
-setboard rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-perft
-
-Depth: 1 Nodes: 20 Time: 0
-Depth: 2 Nodes: 400 Time: 1
-Depth: 3 Nodes: 8902 Time: 7
-Depth: 4 Nodes: 197281 Time: 28
-Depth: 5 Nodes: 4865609 Time: 244
-Depth: 6 Nodes: 119060324 Time: 2086
-Depth: 7 Nodes: 3195901860 Time: 48363
-
-Depth: 1 Nodes: 20 Time: 1
-Depth: 2 Nodes: 400 Time: 2
-Depth: 3 Nodes: 8902 Time: 7
-Depth: 4 Nodes: 197281 Time: 29
-Depth: 5 Nodes: 4865609 Time: 188
-Depth: 6 Nodes: 119060324 Time: 1677
-Depth: 7 Nodes: 3195901860 Time: 41023
-
-
- */

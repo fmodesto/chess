@@ -6,7 +6,6 @@ import static com.fmotech.chess.BitOperations.lowestBit;
 import static com.fmotech.chess.BitOperations.lowestBitPosition;
 import static com.fmotech.chess.BitOperations.nextHighestBit;
 import static com.fmotech.chess.BitOperations.nextLowestBit;
-import static com.fmotech.chess.BitOperations.rotateLeft;
 import static com.fmotech.chess.Board.BISHOP;
 import static com.fmotech.chess.Board.KING;
 import static com.fmotech.chess.Board.KNIGHT;
@@ -21,9 +20,6 @@ import static com.fmotech.chess.Move.MOVE_EP_CAP;
 import static com.fmotech.chess.Move.MOVE_PROMO;
 import static com.fmotech.chess.MoveTables.BISHOP_HIGH_TABLE;
 import static com.fmotech.chess.MoveTables.BISHOP_LOW_TABLE;
-import static com.fmotech.chess.MoveTables.DIR1_TABLE;
-import static com.fmotech.chess.MoveTables.DIR2_TABLE;
-import static com.fmotech.chess.MoveTables.DIR3_TABLE;
 import static com.fmotech.chess.MoveTables.KING_TABLE;
 import static com.fmotech.chess.MoveTables.KNIGHT_TABLE;
 import static com.fmotech.chess.MoveTables.PAWN_ATTACK_HIGH_TABLE;
@@ -38,16 +34,6 @@ public class MoveGenerator {
     private static final long NONE = -1L;
 
     public static final int N = 7, S = 3, W = 5, E = 1, NW = 6, SW = 0, NE = 4, SE = 2;
-    private static int[] SHIFT = { -7, -1, -9, -8, 7, 1, 9, 8 };
-    private static long[] AVOID_WRAP = {
-            0x00fefefefefefefeL,
-            0x7f7f7f7f7f7f7f7fL,
-            0x007f7f7f7f7f7f7fL,
-            0x00ffffffffffffffL,
-            0x7f7f7f7f7f7f7f00L,
-            0xfefefefefefefefeL,
-            0xfefefefefefefe00L,
-            0xffffffffffffff00L };
 
     public static long countMoves(int level, Board board) {
         if (level == 0) return 1;
@@ -174,23 +160,15 @@ public class MoveGenerator {
         long rooks = board.ownRooks();
         while (rooks != 0) {
             int pos = lowestBitPosition(rooks);
-            long mask = generateRookMaks(pos, pieces, ownPieces);
+            long mask = generateLinearMoveFor(pos, ROOK_HIGH_TABLE, ROOK_LOW_TABLE, pieces, ownPieces);
             counter = createMove(moves, counter, board, pos, ROOK, mask & filter);
             rooks = nextLowestBit(rooks);
         }
         return counter;
     }
 
-    public static long generateRookMaks(int pos, long pieces, long ownPieces) {
-        return generateLinearMoveFor(pos, ROOK_HIGH_TABLE, ROOK_LOW_TABLE, pieces, ownPieces);
-    }
-
     private static int generateKnightMoves(Board board, int counter, int[] moves) {
         return generateTargetMoves(board, board.ownKnights(), ~board.ownPieces(), KNIGHT_TABLE, KNIGHT, counter, moves);
-    }
-
-    public static long generateKnightMask(int pos, long pieces, long ownPieces) {
-        return KNIGHT_TABLE[pos] & ~ownPieces;
     }
 
     private static int generateBishopsMoves(Board board, long filter, int counter, int[] moves) {
@@ -199,15 +177,11 @@ public class MoveGenerator {
         long bishops = board.ownBishops();
         while (bishops != 0) {
             int pos = lowestBitPosition(bishops);
-            long mask = generateBishopMask(pos, pieces, ownPieces);
+            long mask = generateLinearMoveFor(pos, BISHOP_HIGH_TABLE, BISHOP_LOW_TABLE, pieces, ownPieces);
             counter = createMove(moves, counter, board, pos, BISHOP, mask & filter);
             bishops = nextLowestBit(bishops);
         }
         return counter;
-    }
-
-    public static long generateBishopMask(int pos, long pieces, long ownPieces) {
-        return generateLinearMoveFor(pos, BISHOP_HIGH_TABLE, BISHOP_LOW_TABLE, pieces, ownPieces);
     }
 
     private static int generateQueensMoves(Board board, long filter, int counter, int[] moves) {
@@ -216,15 +190,12 @@ public class MoveGenerator {
         long queens = board.ownQueens();
         while (queens != 0) {
             int pos = lowestBitPosition(queens);
-            long mask = generateQueenMask(pos, pieces, ownPieces);
+            long mask = generateLinearMoveFor(pos, ROOK_HIGH_TABLE, ROOK_LOW_TABLE, pieces, ownPieces)
+                    | generateLinearMoveFor(pos, BISHOP_HIGH_TABLE, BISHOP_LOW_TABLE, pieces, ownPieces);
             counter = createMove(moves, counter, board, pos, QUEEN, mask & filter);
             queens = nextLowestBit(queens);
         }
         return counter;
-    }
-
-    public static long generateQueenMask(int pos, long pieces, long ownPieces) {
-        return generateRookMaks(pos, pieces, ownPieces) | generateBishopMask(pos, pieces, ownPieces);
     }
 
     private static int generateKingMoves(Board board, int counter, int[] moves) {
@@ -240,10 +211,6 @@ public class MoveGenerator {
             moves[counter++] = Move.create(kingPos, kingPos + 2, KING_MASK, 0, MOVE_CAST_H);
         }
         return counter;
-    }
-
-    public static long generateKingMask(int pos, long pieces, long ownPieces) {
-        return KING_TABLE[pos] & ~ownPieces;
     }
 
     private static long generateLinearMoveFor(int pos, long[] highTable, long[] lowTable, long pieces, long ownPieces) {
@@ -346,34 +313,5 @@ public class MoveGenerator {
             }
         }
         return false;
-    }
-
-    public static int slidingDirection(int pos, long prev) {
-        int dir8 = 0;
-        dir8 |= (DIR3_TABLE[pos] & prev) != 0 ? 0b100 : 0;
-        dir8 |= (DIR2_TABLE[pos] & prev) != 0 ? 0b010 : 0;
-        dir8 |= (DIR1_TABLE[pos] & prev) != 0 ? 0b001 : 0;
-        return dir8;
-    }
-
-    public static long slidingAttacks(long slider, long empty, int dir8) {
-        long fill = occludedFill(slider, empty, dir8);
-        return shiftOne(fill, dir8);
-    }
-
-    private static long occludedFill(long gen, long pro, int dir8) {
-        int r = SHIFT[dir8]; // {+-1,7,8,9}
-        pro &= AVOID_WRAP[dir8];
-        gen |= pro & rotateLeft(gen, r);
-        pro &= rotateLeft(pro, r);
-        gen |= pro & rotateLeft(gen, 2 * r);
-        pro &= rotateLeft(pro, 2 * r);
-        gen |= pro & rotateLeft(gen, 4 * r);
-        return gen;
-    }
-
-    public static long shiftOne(long b, int dir8) {
-        int r = SHIFT[dir8]; // {+-1,7,8,9}
-        return rotateLeft(b, r) & AVOID_WRAP[dir8];
     }
 }

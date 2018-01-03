@@ -1,6 +1,7 @@
 package com.fmotech.chess.ai;
 
 import com.fmotech.chess.Board;
+import com.fmotech.chess.ai.mediocre.OliThinkEvaluation;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -21,7 +22,7 @@ public class ChessyEvaluationTest {
     public void evaluateBoard() throws IOException {
         SeekableByteChannel channel = Files.newByteChannel(Paths.get("board.dat"), READ);
         ByteBuffer buffer = ByteBuffer.allocate(80 * 1024);
-        ChessyEvaluation evaluation = new ChessyEvaluation();
+        OliThinkEvaluation evaluation = new OliThinkEvaluation();
         Board white = Board.INIT.cloneBoard();
         Board black = Board.INIT.cloneBoard();
         int count = 0;

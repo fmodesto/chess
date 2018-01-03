@@ -1,7 +1,5 @@
 package com.fmotech.chess;
 
-import java.util.Random;
-
 public class BitOperations {
 
     public static int lowestBitPosition(long n) {

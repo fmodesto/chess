@@ -286,6 +286,14 @@ public class Board {
         return castle() & RANK_1;
     }
 
+    public long ownRooksQueens() {
+        return ~b4 & (rooks() | queens());
+    }
+
+    public long ownBishopsQueens() {
+        return ~b4 & (bishops() | queens());
+    }
+
     // Enemy pieces
 
     public long enemyPieces() {
@@ -318,6 +326,18 @@ public class Board {
 
     public long enemyCastle() {
         return castle() & RANK_8;
+    }
+
+    public long enemyRooksQueens() {
+        return b4 & (rooks() | queens());
+    }
+
+    public long enemyBishopsQueens() {
+        return b4 & (bishops() | queens());
+    }
+
+    public long enemyEnPassantPawn() {
+        return (b3 & b2 & b1 & 0x0000ff0000000000L) >>> 8;
     }
 
     @Override

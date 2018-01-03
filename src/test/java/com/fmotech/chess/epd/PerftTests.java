@@ -21,7 +21,7 @@ import static org.junit.Assert.assertEquals;
 @RunWith(Parameterized.class)
 public class PerftTests {
 
-    public static final int SKIP = 1;
+    public static final int SKIP = 0;
     private final Epd epd;
 
     @Parameters
@@ -38,12 +38,12 @@ public class PerftTests {
 
     @Test
     public void execute() {
+        System.out.println(epd.board);
         epd.actions.stream().limit(epd.actions.size() - SKIP).forEach(e -> execute(parseLong(e.parameter), epd.board, e.action.charAt(1) - '0'));
         System.out.println("Done");
     }
 
-    public void execute(long expected, Board board, int level) {
-        System.out.println(board);
+    private void execute(long expected, Board board, int level) {
         LocalDateTime start = now();
         long count = MoveGenerator.countMoves(level, board);
         System.out.printf("%d: %10d in %6d ms\n", level, count, MILLIS.between(start, now()));

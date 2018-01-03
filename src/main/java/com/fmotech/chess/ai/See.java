@@ -9,12 +9,14 @@ import static com.fmotech.chess.Board.PAWN;
 import static com.fmotech.chess.Move.MOVE_EP_CAP;
 import static com.fmotech.chess.Move.hasFlag;
 import static com.fmotech.chess.Move.srcType;
-import static com.fmotech.chess.MoveGenerator.slidingAttacks;
-import static com.fmotech.chess.MoveGenerator.slidingDirection;
 import static com.fmotech.chess.MoveTables.KING_TABLE;
 import static com.fmotech.chess.MoveTables.KNIGHT_TABLE;
 import static com.fmotech.chess.MoveTables.PAWN_ATTACK_HIGH_TABLE;
 import static com.fmotech.chess.MoveTables.PAWN_ATTACK_LOW_TABLE;
+import static com.fmotech.chess.Moves.BATT3;
+import static com.fmotech.chess.Moves.BATT4;
+import static com.fmotech.chess.Moves.RATT1;
+import static com.fmotech.chess.Moves.RATT2;
 
 public class See {
 
@@ -38,8 +40,11 @@ public class See {
         gain[depth] = hasFlag(move, MOVE_EP_CAP) ? value[PAWN] : value[board.type(tgt)];
         int type = srcType(move);
 
-        long attackers = attackersTo(board, tgt, tgtPos, pieces);
+        long attackers = attackersTo(board, tgtPos, pieces);
         long color = board.ownPieces();
+
+        long rockMask = RATT1(tgtPos, 0) | RATT2(tgtPos, 0);
+        long lowMask = RATT1(tgtPos, 0) | BATT3(tgtPos, 0);
 
         do {
             depth++;
@@ -49,7 +54,7 @@ public class See {
             attackers ^= src;
             pieces ^= src;
             if (type != KNIGHT)
-                attackers |= updateAttackers(board, tgtPos, tgt, src, pieces);
+                attackers |= updateAttackers(board, tgtPos, src, pieces, rockMask, lowMask);
 
             src = getLeastValuablePiece(board, attackers, color);
             type = board.type(src);
@@ -59,6 +64,17 @@ public class See {
             gain[depth - 1] = -Math.max(-gain[depth - 1], gain[depth]);
 
         return gain[0];
+    }
+
+    private static long attackersTo(Board board, int pos, long pieces) {
+        long attackers = 0;
+        attackers |= (board.enemyPawns() & PAWN_ATTACK_HIGH_TABLE[pos]);
+        attackers |= (board.ownPawns() & PAWN_ATTACK_LOW_TABLE[pos]);
+        attackers |= board.knights() & KNIGHT_TABLE[pos];
+        attackers |= board.kings() & KING_TABLE[pos];
+        attackers |= (board.rooks() | board.queens()) & (RATT1(pos, pieces) | RATT2(pos, pieces));
+        attackers |= (board.bishops() | board.queens()) & (BATT3(pos, pieces) | BATT4(pos, pieces));
+        return attackers & pieces;
     }
 
     private static long getLeastValuablePiece(Board board, long attadef, long color) {
@@ -73,22 +89,17 @@ public class See {
         return 0;
     }
 
-    private static long attackersTo(Board board, long tgt, int pos, long pieces) {
-        long attackers = 0;
-        attackers |= (board.enemyPawns() & PAWN_ATTACK_HIGH_TABLE[pos]);
-        attackers |= (board.ownPawns() & PAWN_ATTACK_LOW_TABLE[pos]);
-        attackers |= board.knights() & KNIGHT_TABLE[pos];
-        attackers |= board.kings() & KING_TABLE[pos];
-        for (int i = 0; i < 8; i += 2)
-            attackers |= (board.bishops() | board.queens()) & slidingAttacks(tgt, ~pieces, i);
-        for (int i = 1; i < 8; i += 2)
-            attackers |= (board.rooks() | board.queens()) & slidingAttacks(tgt, ~pieces, i);
-        return attackers & pieces;
-    }
-
-    private static long updateAttackers(Board board, int pos, long tgt, long last, long pieces) {
-        int dir8 = slidingDirection(pos, last);
-        long attackers = (dir8 & 1) != 0 ? board.rooks() | board.queens() : board.bishops() | board.queens();
-        return attackers & slidingAttacks(tgt, ~pieces, dir8) & pieces;
+    private static long updateAttackers(Board board, int pos, long last, long pieces, long rockMask, long lowMask) {
+        if ((last & rockMask) != 0) {
+            if ((last & lowMask) != 0)
+                return RATT1(pos, pieces) & pieces & (board.rooks() | board.queens());
+            else
+                return RATT2(pos, pieces) & pieces & (board.rooks() | board.queens());
+        } else {
+            if ((last & lowMask) != 0)
+                return BATT3(pos, pieces) & pieces & (board.bishops() | board.queens());
+            else
+                return BATT4(pos, pieces) & pieces & (board.bishops() | board.queens());
+        }
     }
 }

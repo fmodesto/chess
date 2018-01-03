@@ -3,7 +3,9 @@ package com.fmotech.chess;
 import static com.fmotech.chess.DebugUtils.CHESS;
 
 public class MoveTables {
-    public static final long[] PAWN_TABLE = computePawn();
+    public static final long[] PAWN_HIGH_TABLE = computePawnHigh();
+    public static final long[] PAWN_LOW_TABLE = computePawnLow();
+
     public static final long[] PAWN_ATTACK_HIGH_TABLE = computePawnAttackHigh();
     public static final long[] PAWN_ATTACK_LOW_TABLE = computePawnAttackLow();
 
@@ -17,22 +19,6 @@ public class MoveTables {
 
     public static final long[] KING_TABLE = computeKing();
 
-    public static final long[] DIR3_TABLE = computeDir(0b100);
-    public static final long[] DIR2_TABLE = computeDir(0b010);
-    public static final long[] DIR1_TABLE = computeDir(0b001);
-
-    private static long[] computeDir(int bit) {
-        long[] table = new long[64];
-        for (int i = 0; i < table.length; i++) {
-            long slider = 1L << i;
-            for (int j = 0; j < 8; j++) {
-                if ((j & bit) != 0)
-                    table[i] |= MoveGenerator.slidingAttacks(slider, -1, j);
-            }
-        }
-        return table;
-    }
-
     public static void main(String[] args) {
         for (int i = 0; i < 64; i++) {
             long board = KNIGHT_TABLE[i];
@@ -40,10 +26,20 @@ public class MoveTables {
         }
     }
 
-    private static long[] computePawn() {
+    private static long[] computePawnHigh() {
         long[] positions = new long[64];
-        for (int i = 0; i < 64; i++) {
+        for (int i = 8; i < 64; i++) {
             positions[i] = (1L << i) << 8;
+            if (i < 16) positions[i] |= (1L << i) << 16;
+        }
+        return positions;
+    }
+
+    private static long[] computePawnLow() {
+        long[] positions = new long[64];
+        for (int i = 0; i < 56; i++) {
+            positions[i] = (1L << i) >>> 8;
+            if (i > 48) positions[i] = (1L << i) >>> 16;
         }
         return positions;
     }

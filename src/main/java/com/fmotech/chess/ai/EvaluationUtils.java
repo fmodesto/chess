@@ -1,35 +1,23 @@
 package com.fmotech.chess.ai;
 
 import com.fmotech.chess.Board;
-import com.fmotech.chess.DebugUtils;
 
 import static com.fmotech.chess.BitOperations.lowestBitPosition;
 import static com.fmotech.chess.BitOperations.nextLowestBit;
-import static com.fmotech.chess.MoveGenerator.E;
-import static com.fmotech.chess.MoveGenerator.N;
-import static com.fmotech.chess.MoveGenerator.NE;
-import static com.fmotech.chess.MoveGenerator.NW;
-import static com.fmotech.chess.MoveGenerator.S;
-import static com.fmotech.chess.MoveGenerator.SE;
-import static com.fmotech.chess.MoveGenerator.SW;
-import static com.fmotech.chess.MoveGenerator.W;
-import static com.fmotech.chess.MoveGenerator.shiftOne;
-import static com.fmotech.chess.MoveGenerator.slidingAttacks;
-import static com.fmotech.chess.MoveTables.KING_TABLE;
-import static com.fmotech.chess.MoveTables.KNIGHT_TABLE;
+import static com.fmotech.chess.Moves.BATT3;
+import static com.fmotech.chess.Moves.BATT4;
+import static com.fmotech.chess.Moves.BXRAY3;
+import static com.fmotech.chess.Moves.BXRAY4;
+import static com.fmotech.chess.Moves.RATT1;
+import static com.fmotech.chess.Moves.RATT2;
+import static com.fmotech.chess.Moves.RXRAY1;
+import static com.fmotech.chess.Moves.RXRAY2;
 
 public class EvaluationUtils {
 
     public static final long[] PAWN_ISOLATED_TABLE = createPawnIsolatedMask();
     public static final long[][] PAWN_PASSED_TABLE = createPawnPassedMask();
     private static final long FILE_8 = 0x0101010101010101L;
-
-    public static final int PAWN_IDX = 0;
-    public static final int KNIGHT_IDX = 1;
-    public static final int BISHOP_IDX = 2;
-    public static final int ROOK_IDX = 3;
-    public static final int QUEEN_IDX = 4;
-    public static final int KING_IDX = 5;
 
     public static final int OWN_SIDE = 0;
     public static final int ENEMY_SIDE = 1;
@@ -155,52 +143,34 @@ public class EvaluationUtils {
         return array;
     }
 
-    public static void generateMasks(Board board, long[] masks) {
-        masks[0] = shiftOne(board.ownPawns(), NW) | shiftOne(board.ownPawns(), NE);
-        masks[1] = generateMask(board.ownKnights(), KNIGHT_TABLE);
-        masks[2] = generateBishopsMask(board.ownBishops(), ~board.pieces());
-        masks[3] = generateRooksMask(board.ownRooks(), ~board.pieces());
-        masks[4] = generateBishopsMask(board.ownQueens(), ~board.pieces())
-                | generateRooksMask(board.ownQueens(), ~board.pieces());
-        masks[5] = generateMask(board.ownKing(), KING_TABLE);
-        masks[6] = shiftOne(board.enemyPawns(), SW) | shiftOne(board.enemyPawns(), SE);
-        masks[7] = generateMask(board.enemyKnights(), KNIGHT_TABLE);
-        masks[8] = generateBishopsMask(board.enemyBishops(), ~board.pieces());
-        masks[9] = generateRooksMask(board.enemyRooks(), ~board.pieces());
-        masks[10] = generateBishopsMask(board.enemyQueens(), ~board.pieces())
-                | generateRooksMask(board.enemyQueens(), ~board.pieces());
-        masks[11] = generateMask(board.enemyKing(), KING_TABLE);
-    }
-
-    private static long generateBishopsMask(long slider, long empty) {
-        return slider == 0 ? 0 : slidingAttacks(slider, empty, NW)
-                | slidingAttacks(slider, empty, NE)
-                | slidingAttacks(slider, empty, SW)
-                | slidingAttacks(slider, empty, SE);
-    }
-
-    private static long generateRooksMask(long slider, long empty) {
-        return slider == 0 ? 0 : slidingAttacks(slider, empty, N)
-                | slidingAttacks(slider, empty, S)
-                | slidingAttacks(slider, empty, W)
-                | slidingAttacks(slider, empty, E);
-    }
-
-    private static long generateMask(long next, long[] table) {
-        long mask = 0;
-        while (next != 0) {
-            int pos = lowestBitPosition(next);
-            mask |= table[pos];
-            next = nextLowestBit(next);
-        }
-        return mask;
-    }
-
     public static int rank(int pos) {
         return pos >>> 3;
     }
 
     public static int file(int pos) {
         return pos & 0x7;
+    }
+
+    public static long pinnedPieces(Board board, long color) {
+        int king = lowestBitPosition(board.kings() & color);
+        long pin = 0L;
+        long occupied = board.pieces();
+        long next = ((RXRAY1(king, board.pieces()) | RXRAY2(king, board.pieces())) & board.pieces() & ~color) & board.rooksQueens();
+        while (next != 0) {
+            int t = lowestBitPosition(next);
+            pin |= ((RATT1(t, occupied) | RATT2(t, occupied)) & occupied)
+                    & ((RATT1(king, occupied) | RATT2(king, occupied)) & occupied)
+                    & color;
+            next = nextLowestBit(next);
+        }
+        next = ((BXRAY3(king, board.pieces()) | BXRAY4(king, board.pieces())) & ~color) & board.bishopsQueens();
+        while (next != 0) {
+            int t = lowestBitPosition(next);
+            pin |= ((BATT3(t, occupied) | BATT4(t, occupied)) & occupied)
+                    & ((BATT3(king, occupied) | BATT4(king, occupied)) & occupied)
+                    & color;
+            next = nextLowestBit(next);
+        }
+        return pin;
     }
 }

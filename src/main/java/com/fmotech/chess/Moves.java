@@ -1,44 +1,25 @@
 package com.fmotech.chess;
 
 import static com.fmotech.chess.BitOperations.bitCount;
-import static com.fmotech.chess.BitOperations.lowestBitPosition;
-import static com.fmotech.chess.BitOperations.nextLowestBit;
 
 public class Moves {
 
-    private static final long[] rays = new long[0x10000];
-    private static final long[] bmask45 = new long[64];
-    private static final long[] bmask135 = new long[64];
+    private static final long[] RAYS = new long[0x10000];
+    private static final long[] BMASK_045 = new long[64];
+    private static final long[] BMASK_135 = new long[64];
 
     private static long BIT(int f) { return 1L << f; }
     private static boolean TEST(int f, long b) { return (BIT(f) & b) != 0; }
 
-    private static long RXRAY1(int pos, long occupied) { return rays[((pos) << 7) | key000(occupied, pos) | 0x8000]; }
-    private static long RXRAY2(int pos, long occupied) { return rays[((pos) << 7) | key090(occupied, pos) | 0xA000]; }
-    private static long BXRAY3(int pos, long occupied) { return rays[((pos) << 7) | key045(occupied, pos) | 0xC000]; }
-    private static long BXRAY4(int pos, long occupied) { return rays[((pos) << 7) | key135(occupied, pos) | 0xE000]; }
+    public static long RXRAY1(int pos, long occupied) { return RAYS[((pos) << 7) | key000(occupied, pos) | 0x8000]; }
+    public static long RXRAY2(int pos, long occupied) { return RAYS[((pos) << 7) | key090(occupied, pos) | 0xA000]; }
+    public static long BXRAY3(int pos, long occupied) { return RAYS[((pos) << 7) | key045(occupied, pos) | 0xC000]; }
+    public static long BXRAY4(int pos, long occupied) { return RAYS[((pos) << 7) | key135(occupied, pos) | 0xE000]; }
 
-    private static long RATT1(int pos, long occupied) { return rays[((pos) << 7) | key000(occupied, pos)]; }
-    private static long RATT2(int pos, long occupied) { return rays[((pos) << 7) | key090(occupied, pos) | 0x2000]; }
-    private static long BATT3(int pos, long occupied) { return rays[((pos) << 7) | key045(occupied, pos) | 0x4000]; }
-    private static long BATT4(int pos, long occupied) { return rays[((pos) << 7) | key135(occupied, pos) | 0x6000]; }
-
-    private static long RCAP(int pos, long occupied, long enemy) { return ROCC(pos, occupied) & enemy; }
-    private static long BCAP(int pos, long occupied, long enemy) { return BOCC(pos, occupied) & enemy; }
-    private static long ROCC(int pos, long occupied) { return ROCC1(pos, occupied) | ROCC2(pos, occupied); }
-    private static long BOCC(int pos, long occupied) { return BOCC3(pos, occupied) | BOCC4(pos, occupied); }
-
-    private static long ROCC1(int pos, long occupied) { return RATT1(pos, occupied) & occupied; }
-    private static long ROCC2(int pos, long occupied) { return RATT2(pos, occupied) & occupied; }
-    private static long BOCC3(int pos, long occupied) { return BATT3(pos, occupied) & occupied; }
-    private static long BOCC4(int pos, long occupied) { return BATT4(pos, occupied) & occupied; }
-    private static long RMOVE1(int pos, long occupied) { return (RATT1(pos, occupied) & ~occupied); }
-    private static long RMOVE2(int pos, long occupied) { return (RATT2(pos, occupied) & ~occupied); }
-    private static long BMOVE3(int pos, long occupied) { return (BATT3(pos, occupied) & ~occupied); }
-    private static long BMOVE4(int pos, long occupied) { return (BATT4(pos, occupied) & ~occupied); }
-
-    static long RMOVE(int pos, long occupied) { return (RMOVE1(pos, occupied) | RMOVE2(pos, occupied)); }
-    static long BMOVE(int pos, long occupied) { return (BMOVE3(pos, occupied) | BMOVE4(pos, occupied)); }
+    public static long RATT1(int pos, long occupied) { return RAYS[((pos) << 7) | key000(occupied, pos)]; }
+    public static long RATT2(int pos, long occupied) { return RAYS[((pos) << 7) | key090(occupied, pos) | 0x2000]; }
+    public static long BATT3(int pos, long occupied) { return RAYS[((pos) << 7) | key045(occupied, pos) | 0x4000]; }
+    public static long BATT4(int pos, long occupied) { return RAYS[((pos) << 7) | key135(occupied, pos) | 0x6000]; }
 
     private static int key000(long board, int pos) {
         return (int) ((board >> (pos & 0x38)) & 0x7E);
@@ -51,37 +32,16 @@ public class Moves {
     }
 
     private static int key045(long board, int pos) {
-        return keyDiag(board & bmask45[pos]);
+        return keyDiag(board & BMASK_045[pos]);
     }
 
     private static int key135(long board, int pos) {
-        return keyDiag(board & bmask135[pos]);
+        return keyDiag(board & BMASK_135[pos]);
     }
 
     private static int keyDiag(long b) {
         b *= 0x0202020202020202L;
         return (int)((b >> 57) & 0x7F);
-    }
-
-    public static long pinnedPieces(Board board, long color) {
-        int king = lowestBitPosition(board.kings() & color);
-        long pin = 0L;
-        long next = ((RXRAY1(king, board.pieces()) | RXRAY2(king, board.pieces())) & board.pieces() & ~color) & board.rooksQueens();
-        while (next != 0) {
-            int t = lowestBitPosition(next);
-            pin |= RCAP(t, board.pieces(), color) & ROCC(king, board.pieces());
-            next = nextLowestBit(next);
-        }
-        next = ((BXRAY3(king, board.pieces()) | BXRAY4(king, board.pieces())) & ~color) & board.bishopsQueens();
-        DebugUtils.debug(DebugUtils.CHESS, 1, board.pieces());
-        DebugUtils.debug(DebugUtils.CHESS, 1, BATT4(king, board.pieces()));
-        DebugUtils.debug(DebugUtils.CHESS, 1, BXRAY4(king, board.pieces()));
-        while (next != 0) {
-            int t = lowestBitPosition(next);
-            pin |= BCAP(t, board.pieces(), color) & BOCC(king, board.pieces());
-            next = nextLowestBit(next);
-        }
-        return pin;
     }
 
     public static long rookMove(int pos, long pieces, long own) {
@@ -107,22 +67,6 @@ public class Moves {
     public static long queenAttack(int pos, long pieces, long own) {
         return queenMove(pos, pieces, own) & pieces;
     }
-
-
-    public static void main(String[] args) {
-        Board board = Board.fen("Q1n1k3/3p4/8/1B6/Q7/4N3/8/4K3 w KQkq -");
-        long pin = pinnedPieces(board, board.enemyPieces());
-        DebugUtils.debug(DebugUtils.CHESS, 1, pin);
-        DebugUtils.debug(DebugUtils.CHESS, 1, RATT1(63, board.pieces()) | RATT2(63, board.pieces()));
-        DebugUtils.debug(DebugUtils.CHESS, 1, RMOVE(63, board.pieces()));
-    }
-
-
-
-
-
-
-
 
     /**************** INITIALIZER ***************/
 
@@ -191,8 +135,8 @@ public class Moves {
             return (type < 2) ? free : (type == 2 ? occ : xray);
         };
 
-        for (int i = 0; i < 64; i++) bmask45[i] = bishop45.invoke(i, 0L, 0) | BIT(i);
-        for (int i = 0; i < 64; i++) bmask135[i] = bishop135.invoke(i, 0L, 0) | BIT(i);
+        for (int i = 0; i < 64; i++) BMASK_045[i] = bishop45.invoke(i, 0L, 0) | BIT(i);
+        for (int i = 0; i < 64; i++) BMASK_135[i] = bishop135.invoke(i, 0L, 0) | BIT(i);
 
         initRays(0x0000, rook00, Moves::key000);
         initRays(0x2000, rook90, Moves::key090);
@@ -212,8 +156,8 @@ public class Moves {
                 occ = rayFunc.invoke(f, board, 2);
                 xray = rayFunc.invoke(f, board, 3);
                 index = key.invoke(board, f);
-                rays[(f << 7) + index + offset] = occ | move;
-                rays[(f << 7) + index + 0x8000 + offset] = xray;
+                RAYS[(f << 7) + index + offset] = occ | move;
+                RAYS[(f << 7) + index + 0x8000 + offset] = xray;
             }
         }
     }
