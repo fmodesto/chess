@@ -1,7 +1,7 @@
-package com.fmotech.chess.ai.mediocre;
+package com.fmotech.chess.ai;
 
-import com.fmotech.chess.Board;
-import com.fmotech.chess.FenFormatter;
+import com.fmotech.chess.ai.mediocre.Definitions;
+import com.fmotech.chess.ai.mediocre.MediocreBoard;
 
 import java.util.Arrays;
 

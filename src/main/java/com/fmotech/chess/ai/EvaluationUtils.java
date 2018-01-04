@@ -1,18 +1,5 @@
 package com.fmotech.chess.ai;
 
-import com.fmotech.chess.Board;
-
-import static com.fmotech.chess.BitOperations.lowestBitPosition;
-import static com.fmotech.chess.BitOperations.nextLowestBit;
-import static com.fmotech.chess.Moves.BATT3;
-import static com.fmotech.chess.Moves.BATT4;
-import static com.fmotech.chess.Moves.BXRAY3;
-import static com.fmotech.chess.Moves.BXRAY4;
-import static com.fmotech.chess.Moves.RATT1;
-import static com.fmotech.chess.Moves.RATT2;
-import static com.fmotech.chess.Moves.RXRAY1;
-import static com.fmotech.chess.Moves.RXRAY2;
-
 public class EvaluationUtils {
 
     public static final long[] PAWN_ISOLATED_TABLE = createPawnIsolatedMask();
@@ -149,28 +136,5 @@ public class EvaluationUtils {
 
     public static int file(int pos) {
         return pos & 0x7;
-    }
-
-    public static long pinnedPieces(Board board, long color) {
-        int king = lowestBitPosition(board.kings() & color);
-        long pin = 0L;
-        long occupied = board.pieces();
-        long next = ((RXRAY1(king, board.pieces()) | RXRAY2(king, board.pieces())) & board.pieces() & ~color) & board.rooksQueens();
-        while (next != 0) {
-            int t = lowestBitPosition(next);
-            pin |= ((RATT1(t, occupied) | RATT2(t, occupied)) & occupied)
-                    & ((RATT1(king, occupied) | RATT2(king, occupied)) & occupied)
-                    & color;
-            next = nextLowestBit(next);
-        }
-        next = ((BXRAY3(king, board.pieces()) | BXRAY4(king, board.pieces())) & ~color) & board.bishopsQueens();
-        while (next != 0) {
-            int t = lowestBitPosition(next);
-            pin |= ((BATT3(t, occupied) | BATT4(t, occupied)) & occupied)
-                    & ((BATT3(king, occupied) | BATT4(king, occupied)) & occupied)
-                    & color;
-            next = nextLowestBit(next);
-        }
-        return pin;
     }
 }

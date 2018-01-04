@@ -18,27 +18,26 @@ public class SanFormatter {
         if (promotion) move = substring(move, 0, -1);
         long src = move(whiteTurn, substring(move, 1, -2));
         long tgt = move(whiteTurn, substring(move, -2));
-        int[] moves = board.moves();
-        int counter = MoveGenerator.generateValidMoves(board, moves);
+        int[] moves = MoveGenerator.generateMoves(board);
         int m;
         if ("O-O".equals(move)) {
-            m = findMove(board.ownKing(), board.ownKing() >>> 2, counter, moves);
+            m = findMove(board.ownKing(), board.ownKing() >>> 2, moves);
         } else if ("O-O-O".equals(move)) {
-            m = findMove(board.ownKing(), board.ownKing() << 2, counter, moves);
+            m = findMove(board.ownKing(), board.ownKing() << 2, moves);
         } else if (type == 'K') {
-            m = findMove(src & board.ownKing(), tgt, counter, moves);
+            m = findMove(src & board.ownKing(), tgt, moves);
         } else if (type == 'Q') {
-            m = findMove(src & board.ownQueens(), tgt, counter, moves);
+            m = findMove(src & board.ownQueens(), tgt, moves);
         } else if (type == 'B') {
-            m = findMove( src & board.ownBishops(), tgt, counter, moves);
+            m = findMove( src & board.ownBishops(), tgt, moves);
         } else if (type == 'N') {
-            m = findMove( src & board.ownKnights(), tgt, counter, moves);
+            m = findMove( src & board.ownKnights(), tgt, moves);
         } else if (type == 'R') {
-            m = findMove( src & board.ownRooks(), tgt, counter, moves);
+            m = findMove( src & board.ownRooks(), tgt, moves);
         } else if (type == 'P' && promotion) {
-            m = findMove( src & board.ownPawns(), tgt, promo, counter, moves);
+            m = findMove( src & board.ownPawns(), tgt, promo, moves);
         } else if (type == 'P') {
-            m = findMove( src & board.ownPawns(), tgt, counter, moves);
+            m = findMove( src & board.ownPawns(), tgt, moves);
         } else {
             m = 0; // Pass?
         }
@@ -62,8 +61,8 @@ public class SanFormatter {
         }
     }
 
-    private static int findMove(long srcMask, long tgtMask, char promo, int counter, int[] moves) {
-        int move = findMove(srcMask, tgtMask, counter, moves) & 0xF8FFFFFF;
+    private static int findMove(long srcMask, long tgtMask, char promo, int[] moves) {
+        int move = findMove(srcMask, tgtMask, moves) & 0xF8FFFFFF;
         switch (promo) {
             case 'R':
                 return move | Board.ROOK << 24;
@@ -76,8 +75,8 @@ public class SanFormatter {
         }
     }
 
-    private static int findMove(long srcMask, long tgtMask, int counter, int[] moves) {
-        for (int i = 0; i < counter; i++) {
+    private static int findMove(long srcMask, long tgtMask, int[] moves) {
+        for (int i = 1; i < moves[0]; i++) {
             long src = 1L << (moves[i] & 0xFF);
             long tgt = 1L << ((moves[i] >>> 8) & 0xFF);
             if ((src & srcMask) != 0 && (tgt & tgtMask) != 0) {

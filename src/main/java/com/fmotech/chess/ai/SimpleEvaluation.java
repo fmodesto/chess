@@ -5,7 +5,6 @@ import com.fmotech.chess.Board;
 
 import static com.fmotech.chess.BitOperations.lowestBitPosition;
 import static com.fmotech.chess.BitOperations.nextLowestBit;
-import static com.fmotech.chess.BitOperations.reverse;
 import static com.fmotech.chess.ai.EvaluationUtils.ENEMY_SIDE;
 import static com.fmotech.chess.ai.EvaluationUtils.OWN_SIDE;
 import static com.fmotech.chess.ai.EvaluationUtils.toBoardPosition;

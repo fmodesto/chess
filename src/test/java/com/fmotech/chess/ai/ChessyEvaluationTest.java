@@ -1,7 +1,6 @@
 package com.fmotech.chess.ai;
 
 import com.fmotech.chess.Board;
-import com.fmotech.chess.ai.mediocre.OliThinkEvaluation;
 import org.junit.Ignore;
 import org.junit.Test;
 

@@ -1,6 +1,8 @@
 package com.fmotech.chess.ai;
 
 import com.fmotech.chess.Board;
+import com.fmotech.chess.MoveGenerator;
+import com.fmotech.chess.MoveTables;
 
 import static com.fmotech.chess.BitOperations.bitCount;
 import static com.fmotech.chess.BitOperations.fileFill;
@@ -390,13 +392,13 @@ public class ChessyEvaluation implements Evaluation {
             evaluation.mgPosition += KNIGHT_TABLE[side][pos];
             evaluation.egMaterial += KNIGHT_EG;
             evaluation.egPosition += KNIGHT_TABLE[side][pos];
-//            long mask = generateKnightMask(pos, pieces, own);
-//            evaluation.mobility += bitCount(mask);
-//            evaluation.mobility += 2 * bitCount(mask & ~attackMask);
-//            mobilityMask |= mask;
+            long mask = MoveTables.KNIGHT[pos] & ~own;
+            evaluation.mobility += bitCount(mask);
+            evaluation.mobility += 2 * bitCount(mask & ~attackMask);
+            mobilityMask |= mask;
             knights = nextLowestBit(knights);
         }
-        return 0;
+        return mobilityMask;
     }
 
     private long evalBishop(int side, Evaluation evaluation, long bishops, long pieces, long own, long attackMask) {
@@ -409,10 +411,10 @@ public class ChessyEvaluation implements Evaluation {
             evaluation.egMaterial += BISHOP_EG;
             evaluation.egPosition += BISHOP_TABLE[side][pos];
             count += 1;
-//            long mask = Moves.bishopMove(pos, pieces, own);
-//            evaluation.mobility += bitCount(mask);
-//            evaluation.mobility += 2 * bitCount(mask & ~attackMask);
-//            mobilityMask |= mask;
+            long mask = MoveGenerator.bishopMove(pos, pieces) & ~own;
+            evaluation.mobility += bitCount(mask);
+            evaluation.mobility += 2 * bitCount(mask & ~attackMask);
+            mobilityMask |= mask;
             bishops = nextLowestBit(bishops);
         }
         if (count > 1) {
@@ -439,10 +441,10 @@ public class ChessyEvaluation implements Evaluation {
                 evaluation.mgPosition += ROOK_SEMI;
                 evaluation.egPosition += ROOK_SEMI;
             }
-//            long mask = Moves.rookMove(pos, pieces, own);
-//            evaluation.mobility += bitCount(mask);
-//            evaluation.mobility += 2 * bitCount(mask & ~attackMask);
-//            mobilityMask |= mask;
+            long mask = MoveGenerator.rookMove(pos, pieces) & ~own;
+            evaluation.mobility += bitCount(mask);
+            evaluation.mobility += 2 * bitCount(mask & ~attackMask);
+            mobilityMask |= mask;
             next = nextLowestBit(next);
         }
         return mobilityMask;
@@ -463,10 +465,10 @@ public class ChessyEvaluation implements Evaluation {
                 evaluation.mgPosition += QUEEN_SEMI;
                 evaluation.egPosition += QUEEN_SEMI;
             }
-//            long mask = Moves.queenMove(pos, pieces, own);
-//            evaluation.mobility += bitCount(mask);
-//            evaluation.mobility += 2 * bitCount(mask & ~attackMask);
-//            mobilityMask |= mask;
+            long mask = MoveGenerator.queenMove(pos, pieces) & ~own;
+            evaluation.mobility += bitCount(mask);
+            evaluation.mobility += 2 * bitCount(mask & ~attackMask);
+            mobilityMask |= mask;
             next = nextLowestBit(next);
         }
         return mobilityMask;

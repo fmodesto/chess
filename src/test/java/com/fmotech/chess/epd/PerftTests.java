@@ -45,7 +45,7 @@ public class PerftTests {
 
     private void execute(long expected, Board board, int level) {
         LocalDateTime start = now();
-        long count = MoveGenerator.countMoves(level, board);
+        long count = MoveGenerator.countMoves(level, board, false);
         System.out.printf("%d: %10d in %6d ms\n", level, count, MILLIS.between(start, now()));
         assertEquals(expected, count);
     }

@@ -1,9 +1,8 @@
 package com.fmotech.chess.ai.mediocre;
 
 import com.fmotech.chess.Board;
+import com.fmotech.chess.ai.OliThinkEvaluation;
 import org.junit.Test;
-
-import static org.junit.Assert.*;
 
 public class OliThinkEvaluationTest {
 

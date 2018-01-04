@@ -54,18 +54,6 @@ public class DebugUtils {
         return whiteTurn ? board : board.nextTurn();
     }
 
-    public static void debugPerft(Board board, int level) {
-        int[] moves = board.moves();
-        int counter = MoveGenerator.generateValidMoves(board, moves);
-        long total = 0;
-        for (int i = 0; i < counter; i++) {
-            long c = MoveGenerator.countMoves(level - 1, board.move(moves[i]).nextTurn());
-            total += c;
-            System.out.println(FenFormatter.moveToFen(board, moves[i]) + ": " + c);
-        }
-        System.out.println("Total: " + total);
-    }
-
     public static void debug(String symbols, int type, long board) {
         debug(symbols, Board.of(0, 0, test(type, 0b100) ? board : 0, test(type, 0b010) ? board : 0, test(type, 0b001) ? board : 0));
     }

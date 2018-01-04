@@ -1,10 +1,10 @@
 package com.fmotech.chess;
 
-import static com.fmotech.chess.BitOperations.highestBit;
-import static com.fmotech.chess.BitOperations.highestBitPosition;
+import java.util.HashMap;
+import java.util.Map;
+
 import static com.fmotech.chess.BitOperations.lowestBit;
 import static com.fmotech.chess.BitOperations.lowestBitPosition;
-import static com.fmotech.chess.BitOperations.nextHighestBit;
 import static com.fmotech.chess.BitOperations.nextLowestBit;
 import static com.fmotech.chess.Board.BISHOP;
 import static com.fmotech.chess.Board.KING;
@@ -12,306 +12,384 @@ import static com.fmotech.chess.Board.KNIGHT;
 import static com.fmotech.chess.Board.PAWN;
 import static com.fmotech.chess.Board.QUEEN;
 import static com.fmotech.chess.Board.ROOK;
-import static com.fmotech.chess.Board.SPECIAL;
-import static com.fmotech.chess.Move.MOVE_CAST_H;
-import static com.fmotech.chess.Move.MOVE_CAST_L;
-import static com.fmotech.chess.Move.MOVE_EP;
-import static com.fmotech.chess.Move.MOVE_EP_CAP;
-import static com.fmotech.chess.Move.MOVE_PROMO;
-import static com.fmotech.chess.MoveTables.BISHOP_HIGH_TABLE;
-import static com.fmotech.chess.MoveTables.BISHOP_LOW_TABLE;
-import static com.fmotech.chess.MoveTables.KING_TABLE;
-import static com.fmotech.chess.MoveTables.KNIGHT_TABLE;
-import static com.fmotech.chess.MoveTables.PAWN_ATTACK_HIGH_TABLE;
-import static com.fmotech.chess.MoveTables.ROOK_HIGH_TABLE;
-import static com.fmotech.chess.MoveTables.ROOK_LOW_TABLE;
+import static com.fmotech.chess.FenFormatter.moveToFen;
+import static com.fmotech.chess.MoveTables.BATT3;
+import static com.fmotech.chess.MoveTables.BATT4;
+import static com.fmotech.chess.MoveTables.BXRAY3;
+import static com.fmotech.chess.MoveTables.BXRAY4;
+import static com.fmotech.chess.MoveTables.DIR;
+import static com.fmotech.chess.MoveTables.MASK;
+import static com.fmotech.chess.MoveTables.RATT1;
+import static com.fmotech.chess.MoveTables.RATT2;
+import static com.fmotech.chess.MoveTables.RXRAY1;
+import static com.fmotech.chess.MoveTables.RXRAY2;
+import static com.fmotech.chess.Utils.BIT;
+import static com.fmotech.chess.Utils.RANK;
+import static com.fmotech.chess.Utils.TEST;
 
 public class MoveGenerator {
 
     public static final int KING_MASK = 0x8 | KING;
-    private static final long PAWN_RANK = 0x000000000000ff00L;
-    private static final long RANK_7 = 0x00FF0000_00000000L;
-    private static final long NONE = -1L;
 
-    public static final int N = 7, S = 3, W = 5, E = 1, NW = 6, SW = 0, NE = 4, SE = 2;
-
-    public static long countMoves(int level, Board board) {
-        if (level == 0) return 1;
-        long scenarios = 0;
-        int[] moves = board.moves();
-        int counter = generateDirtyMoves(board, moves);
-        for (int i = 0; i < counter; i++) {
-            Board nextBoard = board.move(moves[i]);
-            int kingPosition = lowestBitPosition(nextBoard.ownKing());
-            if (!isPositionInAttack(nextBoard, kingPosition)) {
-                scenarios += countMoves(level - 1, nextBoard.nextTurn());
-            }
-        }
-        return scenarios;
+    public static void main(String[] args) {
+        System.out.println(countMoves(3, Board.INIT, false));
     }
 
-    public static int generateValidMoves(Board board, int[] moves) {
-        int counter = generateDirtyMoves(board, moves);
-        int index = 0;
-        for (int i = 0; i < counter; i++) {
-            Board nextBoard = board.move(moves[i]);
-            if (isValid(nextBoard)) {
-                moves[index++] = moves[i];
+    public static Map<String, Long> moves = new HashMap<>();
+    public static long countMoves(int depth, Board board, boolean div) {
+        long count = 0L;
+        int[] moves = generateMoves(board);
+        if (depth == 1) return moves[0] - 1;
+        if (div) MoveGenerator.moves.clear();
+        for (int i = 1; i < moves[0]; i++) {
+            int move = moves[i];
+            long n = countMoves(depth - 1, board.move(move).nextTurn(), false);
+            count += n;
+            if (div) {
+                System.out.println(moveToFen(board, move) + " " + n + " " + move);
+                MoveGenerator.moves.put(moveToFen(board, move), n);
             }
         }
-        return index;
+        return count;
     }
 
-    public static boolean isValid(Board board) {
-        int kingPosition = lowestBitPosition(board.ownKing());
-        return !isPositionInAttack(board, kingPosition);
+    public static int[] generateMoves(Board board) {
+        int king = lowestBitPosition(board.ownKing());
+        long check = attackingPieces(king, board);
+        long pin = pinnedPieces(king, board);
+        return generate(king, check, pin, true, true, true, board);
     }
 
     public static boolean isInCheck(Board board) {
-        return !isValid(board);
+        int king = lowestBitPosition(board.ownKing());
+        return positionAttacked(king, board);
     }
 
-    public static int generateDirtyMoves(Board board, int[] moves) {
-        int counter = 0;
-        counter = generatePawnMoves(board, counter, moves);
-        counter = generateRooksMoves(board, NONE, counter, moves);
-        counter = generateKnightMoves(board, counter, moves);
-        counter = generateBishopsMoves(board, NONE, counter, moves);
-        counter = generateQueensMoves(board, NONE, counter, moves);
-        counter = generateKingMoves(board, counter, moves);
-        return counter;
-    }
+    public static int[] generate(int king, long check, long pin, boolean capture, boolean nonCapture, boolean allPromotions, Board board) {
+        int[] moves = board.moves();
+        moves[0] = 1;
 
-    public static int generateDirtyCaptureMoves(Board board, int[] moves) {
-        int counter = 0;
-        counter = generatePawnAttackAndQueenPromotionsMoves(board, counter, moves);
-        counter = generateRooksMoves(board, board.enemyPieces(), counter, moves);
-        counter = generateKnightAttackMoves(board, counter, moves);
-        counter = generateBishopsMoves(board, board.enemyPieces(), counter, moves);
-        counter = generateQueensMoves(board, board.enemyPieces(), counter, moves);
-        counter = generateKingAttackMoves(board, counter, moves);
-        return counter;
-    }
-
-    private static int generateKingAttackMoves(Board board, int counter, int[] moves) {
-        return generateTargetMoves(board, board.ownKing(), board.enemyPieces(), KING_TABLE, KING_MASK, counter, moves);
-    }
-
-    private static int generateKnightAttackMoves(Board board, int counter, int[] moves) {
-        return generateTargetMoves(board, board.ownKnights(), board.enemyPieces(), KNIGHT_TABLE, KNIGHT, counter, moves);
-    }
-
-    private static int generatePawnAttackAndQueenPromotionsMoves(Board board, int counter, int[] moves) {
-        long pawns = board.ownPawns();
-        while (pawns != 0) {
-            long pawn = lowestBit(pawns);
-            int srcPos = lowestBitPosition(pawns);
-            int promote = (pawn & RANK_7) != 0 ? MOVE_PROMO : 0;
-            long next = pawn << 8;
-            if ((pawn & RANK_7) != 0 && (board.pieces() & next) == 0) {
-                int tgtPos = lowestBitPosition(next);
-                moves[counter++] = Move.create(srcPos, tgtPos, PAWN, 0, MOVE_PROMO | QUEEN);
-            }
-            next = PAWN_ATTACK_HIGH_TABLE[srcPos] & board.enemyPieces();
-            while (next != 0) {
-                int tgtPos = lowestBitPosition(next);
-                int capture = board.type(tgtPos, ROOK, SPECIAL);
-                counter = createPawnMove(moves, counter, srcPos, tgtPos, capture, promote);
-                next = nextLowestBit(next);
-            }
-            pawns = nextLowestBit(pawns);
+        if (check != 0) {
+            generateCheckEscape(moves, king, check, pin, allPromotions, board);
+            return moves;
         }
-        return counter;
+        if (capture)
+            generateCaptureMoves(moves, king, check, pin, allPromotions, board);
+        if (nonCapture)
+            generateNonCaptureMoves(moves, king, check, pin, allPromotions, board);
+        return moves;
     }
 
-    private static int generatePawnMoves(Board board, int counter, int[] moves) {
-        long pawns = board.ownPawns();
-        while (pawns != 0) {
-            long pawn = lowestBit(pawns);
-            int srcPos = lowestBitPosition(pawns);
-            int promote = (pawn & RANK_7) != 0 ? MOVE_PROMO : 0;
-            long next = pawn << 8;//PAWN[pos];
-            if ((board.pieces() & next) == 0) {
-                int tgtPos = lowestBitPosition(next);
-                counter = createPawnMove(moves, counter, srcPos, tgtPos, 0, promote);
-                if ((pawn & PAWN_RANK) != 0) {
-                    next <<= 8;
-                    tgtPos = lowestBitPosition(next);
-                    if ((board.pieces() & next) == 0) {
-                        counter = createPawnMove(moves, counter, srcPos, tgtPos, 0, MOVE_EP);
-                    }
+    private static void generateCheckEscape(int[] moves, int king, long check, long pin, boolean allPromotions, Board board) {
+        generateKingMoves(moves, king, ~board.ownPieces(), board);
+
+        if (nextLowestBit(check) != 0) return; // Can't capture several pieces
+
+        int target = lowestBitPosition(check);
+        int type = board.type(check);
+
+        long capturers = defendingPieces(target, board) & ~pin;
+        while (capturers != 0) {
+            int from = lowestBitPosition(capturers);
+            int piece = board.type(lowestBit(capturers));
+            if (piece == PAWN) {
+                registerPawnMove(moves, from, target, type, allPromotions);
+            } else {
+                moves[moves[0]++] = Move.create(from, target, piece, type, 0);
+            }
+            capturers = nextLowestBit(capturers);
+        }
+
+        if (board.enemyEnPassantPawn() == check) {
+            int enPassantPosition = lowestBitPosition(board.enPassant());
+            capturers = MoveTables.PAWN_ATTACK[1][enPassantPosition] & board.ownPawns() & ~pin;
+            while (capturers != 0) {
+                int from = lowestBitPosition(capturers);
+                moves[moves[0]++] = Move.create(from, enPassantPosition, PAWN, PAWN, 0);
+                capturers = nextLowestBit(capturers);
+            }
+        }
+
+        if ((check & (MoveTables.KNIGHT[king] | MoveTables.KING[king])) != 0) return; // Can't block
+
+        long segment = getSegment(king, target, board.pieces());
+        while (segment != 0) {
+            int to = lowestBitPosition(segment);
+            long blockers = reach(to, board) & ~pin;
+            while (blockers != 0) {
+                int from = lowestBitPosition(blockers);
+                int piece = board.type(lowestBit(blockers));
+                moves[moves[0]++] = Move.create(from, to, piece, 0, 0);
+                blockers = nextLowestBit(blockers);
+            }
+            int from = to - 8;
+            if (from >= 0 && from < 64) {
+                if ((BIT(from) & board.ownPawns() & ~pin) != 0)
+                    registerPawnMove(moves, from, to, 0, allPromotions);
+
+                int jump = from - 8;
+                if (RANK(to) == 3 && (board.pieces() & BIT(from)) == 0
+                        && (BIT(jump) & board.ownPawns() & ~pin) != 0)
+                    moves[moves[0]++] = Move.create(jump, to, PAWN, 0, 0);
+            }
+            segment = nextLowestBit(segment);
+        }
+    }
+
+    private static long getSegment(int from, int to, long pieces) {
+        int dir = DIR(from, to);
+        if (dir == 1) return RATT1(from, pieces) & RATT1(to, pieces) & ~pieces;
+        else if (dir == 2) return RATT2(from, pieces) & RATT2(to, pieces) & ~pieces;
+        else if (dir == 3) return BATT3(from, pieces) & BATT3(to, pieces) & ~pieces;
+        else return BATT4(from, pieces) & BATT4(to, pieces) & ~pieces;
+    }
+
+    private static void generateKingMoves(int[] moves, int king, long mask, Board board) {
+        long enemy = board.enemyPieces();
+
+        long next = MoveTables.KING[king] & mask;
+        while (next != 0) {
+            int to = lowestBitPosition(next);
+            long bit = lowestBit(next);
+            if (!positionAttacked(to, board))
+                moves[moves[0]++] = Move.create(king, to, KING_MASK, (bit & enemy) != 0 ? board.type(bit) : 0, 0);
+            next = nextLowestBit(next);
+        }
+    }
+
+    public static void generateNonCaptureMoves(int[] moves, int king, long check, long pin, boolean allPromotions, Board board) {
+        long next = board.ownPawns();
+        while (next != 0) {
+            int from = lowestBitPosition(next);
+            long mask = (pin & lowestBit(next)) != 0 ? ~MASK(from, king) : 0;
+            int to = from + 8;
+            if (!TEST(to, board.pieces() | mask)) {
+                registerPawnMove(moves, from, to, 0, allPromotions);
+                if (RANK(from) == 1) {
+                    to += 8;
+                    if (!TEST(to, board.pieces() | mask))
+                        moves[moves[0]++] = Move.create(from, to, PAWN, 0, 0);
                 }
             }
-            next = PAWN_ATTACK_HIGH_TABLE[srcPos] & (board.enemyPieces() | board.enPassant());
-            while (next != 0) {
-                int tgtPos = lowestBitPosition(next);
-                int capture = board.type(tgtPos, ROOK, SPECIAL);
-                counter = createPawnMove(moves, counter, srcPos, tgtPos, capture, promote);
-                next = nextLowestBit(next);
-            }
-            pawns = nextLowestBit(pawns);
-        }
-        return counter;
-    }
-
-    private static int generateRooksMoves(Board board, long filter, int counter, int[] moves) {
-        long pieces = board.pieces();
-        long ownPieces = board.ownPieces();
-        long rooks = board.ownRooks();
-        while (rooks != 0) {
-            int pos = lowestBitPosition(rooks);
-            long mask = generateLinearMoveFor(pos, ROOK_HIGH_TABLE, ROOK_LOW_TABLE, pieces, ownPieces);
-            counter = createMove(moves, counter, board, pos, ROOK, mask & filter);
-            rooks = nextLowestBit(rooks);
-        }
-        return counter;
-    }
-
-    private static int generateKnightMoves(Board board, int counter, int[] moves) {
-        return generateTargetMoves(board, board.ownKnights(), ~board.ownPieces(), KNIGHT_TABLE, KNIGHT, counter, moves);
-    }
-
-    private static int generateBishopsMoves(Board board, long filter, int counter, int[] moves) {
-        long pieces = board.pieces();
-        long ownPieces = board.ownPieces();
-        long bishops = board.ownBishops();
-        while (bishops != 0) {
-            int pos = lowestBitPosition(bishops);
-            long mask = generateLinearMoveFor(pos, BISHOP_HIGH_TABLE, BISHOP_LOW_TABLE, pieces, ownPieces);
-            counter = createMove(moves, counter, board, pos, BISHOP, mask & filter);
-            bishops = nextLowestBit(bishops);
-        }
-        return counter;
-    }
-
-    private static int generateQueensMoves(Board board, long filter, int counter, int[] moves) {
-        long pieces = board.pieces();
-        long ownPieces = board.ownPieces();
-        long queens = board.ownQueens();
-        while (queens != 0) {
-            int pos = lowestBitPosition(queens);
-            long mask = generateLinearMoveFor(pos, ROOK_HIGH_TABLE, ROOK_LOW_TABLE, pieces, ownPieces)
-                    | generateLinearMoveFor(pos, BISHOP_HIGH_TABLE, BISHOP_LOW_TABLE, pieces, ownPieces);
-            counter = createMove(moves, counter, board, pos, QUEEN, mask & filter);
-            queens = nextLowestBit(queens);
-        }
-        return counter;
-    }
-
-    private static int generateKingMoves(Board board, int counter, int[] moves) {
-        long king = board.ownKing();
-        int kingPos = lowestBitPosition(king);
-        counter = generateTargetMoves(board, king, ~board.ownPieces(), KING_TABLE, KING_MASK, counter, moves);
-        if (board.castleLow() && !isPositionInAttack(board, kingPos) && !isPositionInAttack(board, kingPos - 1)
-                && !isPositionInAttack(board, kingPos - 2)) {
-            moves[counter++] = Move.create(kingPos, kingPos - 2, KING_MASK, 0, MOVE_CAST_L);
-        }
-        if (board.castleHigh() && !isPositionInAttack(board, kingPos) && !isPositionInAttack(board, kingPos + 1)
-                && !isPositionInAttack(board, kingPos + 2)) {
-            moves[counter++] = Move.create(kingPos, kingPos + 2, KING_MASK, 0, MOVE_CAST_H);
-        }
-        return counter;
-    }
-
-    private static long generateLinearMoveFor(int pos, long[] highTable, long[] lowTable, long pieces, long ownPieces) {
-        long move = 0;
-        long next = highTable[pos];
-        move |= next;
-        next &= pieces;
-        while (next != 0) {
-            long contact = lowestBit(next);
-            int contactPos = lowestBitPosition(contact);
-            long mask = ~highTable[contactPos];
-            move &= mask;
-            next &= mask;
             next = nextLowestBit(next);
         }
-        next = lowTable[pos];
-        move |= next;
-        next &= pieces;
+
+        next = board.ownKnights();
         while (next != 0) {
-            long contact = highestBit(next);
-            int contactPos = highestBitPosition(contact);
-            long mask = ~lowTable[contactPos];
-            move &= mask;
-            next &= mask;
-            next = nextHighestBit(next);
+            int from = lowestBitPosition(next);
+            long mask = (pin & lowestBit(next)) != 0 ? MASK(from, king) : -1;
+            long target = MoveTables.KNIGHT[from] & ~board.pieces() & mask;
+            registerMoves(moves, from, KNIGHT, target);
+            next = nextLowestBit(next);
         }
-        return move & ~ownPieces;
+
+        next = board.ownBishops();
+        while (next != 0) {
+            int from = lowestBitPosition(next);
+            long mask = (pin & lowestBit(next)) != 0 ? MASK(from, king) : -1;
+            long target = bishopMove(from, board.pieces()) & ~board.pieces() & mask;
+            registerMoves(moves, from, BISHOP, target);
+            next = nextLowestBit(next);
+        }
+
+        next = board.ownRooks();
+        while (next != 0) {
+            int from = lowestBitPosition(next);
+            long mask = (pin & lowestBit(next)) != 0 ? MASK(from, king) : -1;
+            long target = rookMove(from, board.pieces()) & ~board.pieces() & mask;
+            registerMoves(moves, from, ROOK, target);
+            if (board.castle() != 0 && check == 0) {
+                if (board.castleLow() && (from == 0) && (RATT1(0, board.pieces()) & BIT(3)) != 0
+                        && !(positionAttacked(2, board) | positionAttacked(1, board))) {
+                    moves[moves[0]++] = Move.create(3, 1, KING_MASK, 0, 0);
+                }
+                if (board.castleHigh() && (from == 7) && (RATT1(7, board.pieces()) & BIT(3)) != 0
+                        && !(positionAttacked(4, board) | positionAttacked(5, board))) {
+                    moves[moves[0]++] = Move.create(3, 5, KING_MASK, 0, 0);
+                }
+            }
+            next = nextLowestBit(next);
+        }
+
+        next = board.ownQueens();
+        while (next != 0) {
+            int from = lowestBitPosition(next);
+            long mask = (pin & lowestBit(next)) != 0 ? MASK(from, king) : -1;
+            long target = queenMove(from, board.pieces()) & ~board.pieces() & mask;
+            registerMoves(moves, from, QUEEN, target);
+            next = nextLowestBit(next);
+        }
+
+        generateKingMoves(moves, king, ~board.pieces(), board);
     }
 
-    private static int generateTargetMoves(Board board, long pieces, long filter, long[] table, int srcType, int counter, int[] moves) {
-        while (pieces != 0) {
-            int srcPos = lowestBitPosition(pieces);
-            counter = createMove(moves, counter, board, srcPos, srcType, table[srcPos] & filter);
-            pieces = nextLowestBit(pieces);
+    public static void generateCaptureMoves(int[] moves, int king, long check, long pin, boolean allPromotions, Board board) {
+        long next = board.ownPawns();
+        while (next != 0) {
+            int from = lowestBitPosition(next);
+            long mask = (pin & lowestBit(next)) != 0 ? MASK(from, king) : -1;
+            long target = MoveTables.PAWN_ATTACK[0][from] & (board.enPassant() | board.enemyPieces()) & mask;
+            if ((target & board.enPassant()) != 0) {
+                long ray = RATT1(from, board.pieces() ^ board.enemyEnPassantPawn());
+                if ((ray & BIT(king)) != 0 && (ray & board.enemyRooksQueens()) != 0) {
+                    target ^= board.enPassant();
+                }
+            }
+            boolean promotion = RANK(from) == 6;
+            if (target != 0 && promotion && allPromotions) {
+                registerAttackMoves(moves, from, PAWN, target, QUEEN, board);
+                registerAttackMoves(moves, from, PAWN, target, ROOK, board);
+                registerAttackMoves(moves, from, PAWN, target, BISHOP, board);
+                registerAttackMoves(moves, from, PAWN, target, KNIGHT, board);
+            } else {
+                registerAttackMoves(moves, from, PAWN, target, promotion ? QUEEN : 0, board);
+            }
+            next = nextLowestBit(next);
         }
-        return counter;
+
+        next = board.ownKnights();
+        while (next != 0) {
+            int from = lowestBitPosition(next);
+            long mask = (pin & lowestBit(next)) != 0 ? MASK(from, king) : -1;
+            long target = MoveTables.KNIGHT[from] & board.enemyPieces() & mask;
+            registerAttackMoves(moves, from, KNIGHT, target, 0, board);
+            next = nextLowestBit(next);
+        }
+
+        next = board.ownBishops();
+        while (next != 0) {
+            int from = lowestBitPosition(next);
+            long mask = (pin & lowestBit(next)) != 0 ? MASK(from, king) : -1;
+            long target = bishopMove(from, board.pieces()) & board.enemyPieces() & mask;
+            registerAttackMoves(moves, from, BISHOP, target, 0, board);
+            next = nextLowestBit(next);
+        }
+
+        next = board.ownRooks();
+        while (next != 0) {
+            int from = lowestBitPosition(next);
+            long mask = (pin & lowestBit(next)) != 0 ? MASK(from, king) : -1;
+            long target = rookMove(from, board.pieces()) & board.enemyPieces() & mask;
+            registerAttackMoves(moves, from, ROOK, target, 0, board);
+            next = nextLowestBit(next);
+        }
+
+        next = board.ownQueens();
+        while (next != 0) {
+            int from = lowestBitPosition(next);
+            long mask = (pin & lowestBit(next)) != 0 ? MASK(from, king) : -1;
+            long target = queenMove(from, board.pieces()) & board.enemyPieces() & mask;
+            registerAttackMoves(moves, from, QUEEN, target, 0, board);
+            next = nextLowestBit(next);
+        }
+
+        generateKingMoves(moves, king, board.enemyPieces(), board);
     }
 
-    private static int createPawnMove(int[] moves, int counter, int srcPos, int tgtPos, int tgtType, int flags) {
-        if (flags == MOVE_PROMO) {
-            moves[counter++] = Move.create(srcPos, tgtPos, PAWN, tgtType, MOVE_PROMO | QUEEN);
-            moves[counter++] = Move.create(srcPos, tgtPos, PAWN, tgtType, MOVE_PROMO | ROOK);
-            moves[counter++] = Move.create(srcPos, tgtPos, PAWN, tgtType, MOVE_PROMO | BISHOP);
-            moves[counter++] = Move.create(srcPos, tgtPos, PAWN, tgtType, MOVE_PROMO | KNIGHT);
-        } else if (tgtType == SPECIAL) {
-            moves[counter++] = Move.create(srcPos, tgtPos, PAWN, PAWN, MOVE_EP_CAP);
+    private static void registerMoves(int[] moves, int from, int piece, long target) {
+        while (target != 0) {
+            int to = lowestBitPosition(target);
+            moves[moves[0]++] = Move.create(from, to, piece, 0, 0);
+            target = nextLowestBit(target);
+        }
+    }
+
+    private static void registerPawnMove(int[] moves, int from, int to, int capture, boolean allPromotions) {
+        boolean promotion = RANK(from) == 6;
+        if (promotion && allPromotions) {
+            moves[moves[0]++] = Move.create(from, to, PAWN, capture, QUEEN);
+            moves[moves[0]++] = Move.create(from, to, PAWN, capture, ROOK);
+            moves[moves[0]++] = Move.create(from, to, PAWN, capture, BISHOP);
+            moves[moves[0]++] = Move.create(from, to, PAWN, capture, KNIGHT);
         } else {
-            moves[counter++] = Move.create(srcPos, tgtPos, PAWN, tgtType, flags);
+            moves[moves[0]++] = Move.create(from, to, PAWN, capture, promotion ? QUEEN : 0);
         }
-        return counter;
     }
 
-    private static int createMove(int[] moves, int counter, Board board, int srcPos, int srcType, long mask) {
-        long next = mask;
+    private static void registerAttackMoves(int[] moves, int from, int piece, long target, int promotion, Board board) {
+        while (target != 0) {
+            int to = lowestBitPosition(target);
+            long capture = lowestBit(target);
+            moves[moves[0]++] = Move.create(from, to, piece, board.type(capture), promotion);
+            target = nextLowestBit(target);
+        }
+    }
+
+    @SuppressWarnings("RedundantIfStatement")
+    public static boolean positionAttacked(int position, Board board) {
+        long pieces = board.pieces() ^ board.ownKing();
+        if ((MoveTables.PAWN_ATTACK[0][position] & board.enemyPawns()) != 0) return true;
+        if ((MoveTables.KNIGHT[position] & board.enemyKnights()) != 0) return true;
+        if ((MoveTables.KING[position] & board.enemyKing()) != 0) return true;
+        if ((RATT1(position, pieces) & board.enemyRooksQueens()) != 0) return true;
+        if ((RATT2(position, pieces) & board.enemyRooksQueens()) != 0) return true;
+        if ((BATT3(position, pieces) & board.enemyBishopsQueens()) != 0) return true;
+        if ((BATT4(position, pieces) & board.enemyBishopsQueens()) != 0) return true;
+        return false;
+    }
+
+    private static long defendingPieces(int position, Board board) {
+        return MoveTables.PAWN_ATTACK[1][position] & board.ownPawns()
+                | MoveTables.KNIGHT[position] & board.ownKnights()
+                | rookMove(position, board.pieces()) & board.ownRooksQueens()
+                | bishopMove(position, board.pieces()) & board.ownBishopsQueens();
+    }
+
+    public static long attackingPieces(int position, Board board) {
+        return MoveTables.PAWN_ATTACK[0][position] & board.enemyPawns()
+                | MoveTables.KNIGHT[position] & board.enemyKnights()
+                | rookMove(position, board.pieces()) & board.enemyRooksQueens()
+                | bishopMove(position, board.pieces()) & board.enemyBishopsQueens();
+    }
+
+    private static long reach(int position, Board board) {
+        return MoveTables.KNIGHT[position] & board.ownKnights()
+                | rookMove(position, board.pieces()) & board.ownRooksQueens()
+                | bishopMove(position, board.pieces()) & board.ownBishopsQueens();
+    }
+
+    public static long pinnedPieces(int position, Board board) {
+        return pinnedPieces(position, board, board.ownPieces(), board.enemyPieces());
+    }
+
+    public static long pinnedPieces(int position, Board board, long own, long enemy) {
+        long pin = 0L;
+        long next = RXRAY1(position, board.pieces()) & board.rooksQueens() & enemy;
         while (next != 0) {
-            int tgtPos = lowestBitPosition(next);
-            int tgtType = board.type(tgtPos, ROOK, 0);
-            moves[counter++] = Move.create(srcPos, tgtPos, srcType, tgtType, 0);
+            int pinner = lowestBitPosition(next);
+            pin |= RATT1(pinner, board.pieces()) & RATT1(position, board.pieces()) & own;
             next = nextLowestBit(next);
         }
-        return counter;
-    }
-
-    public static boolean isPositionInAttack(Board board, int pos) {
-        assert pos < 64;
-        long pieces = board.pieces();
-        if ((PAWN_ATTACK_HIGH_TABLE[pos] & board.enemyPawns()) != 0) return true;
-        if ((KNIGHT_TABLE[pos] & board.enemyKnights()) != 0) return true;
-        if ((KING_TABLE[pos] & board.enemyKing()) != 0) return true;
-        long rooksQueens = board.enemyRooks() | board.enemyQueens();
-        if (isPositionInAttackHigh(pos, rooksQueens, pieces, ROOK_HIGH_TABLE)) return true;
-        if (isPositionInAttackLow(pos, rooksQueens, pieces, ROOK_LOW_TABLE)) return true;
-        long bishopsQueens = board.enemyBishops() | board.enemyQueens();
-        if (isPositionInAttackHigh(pos, bishopsQueens, pieces, BISHOP_HIGH_TABLE)) return true;
-        if (isPositionInAttackLow(pos, bishopsQueens, pieces, BISHOP_LOW_TABLE)) return true;
-        return false;
-    }
-
-    private static boolean isPositionInAttackHigh(int pos, long targetPieces, long pieces, long[] highTable) {
-        if ((highTable[pos] & targetPieces) != 0) {
-            long next = highTable[pos] & pieces;
-            while (next != 0) {
-                long contact = lowestBit(next);
-                if ((contact & targetPieces) != 0) return true;
-                next &= ~highTable[lowestBitPosition(contact)];
-                next = nextLowestBit(next);
-            }
+        next = RXRAY2(position, board.pieces()) & board.rooksQueens() & enemy;
+        while (next != 0) {
+            int pinner = lowestBitPosition(next);
+            pin |= RATT2(pinner, board.pieces()) & RATT2(position, board.pieces()) & own;
+            next = nextLowestBit(next);
         }
-        return false;
+        next = BXRAY3(position, board.pieces()) & board.bishopsQueens() & enemy;
+        while (next != 0) {
+            int pinner = lowestBitPosition(next);
+            pin |= BATT3(pinner, board.pieces()) & BATT3(position, board.pieces()) & own;
+            next = nextLowestBit(next);
+        }
+        next = BXRAY4(position, board.pieces()) & board.bishopsQueens() & enemy;
+        while (next != 0) {
+            int pinner = lowestBitPosition(next);
+            pin |= BATT4(pinner, board.pieces()) & BATT4(position, board.pieces()) & own;
+            next = nextLowestBit(next);
+        }
+        return pin;
     }
 
-    private static boolean isPositionInAttackLow(int pos, long targetPieces, long pieces, long[] lowTable) {
-        if ((lowTable[pos] & targetPieces) != 0) {
-            long next = lowTable[pos] & pieces;
-            while (next != 0) {
-                long contact = highestBit(next);
-                if ((contact & targetPieces) != 0) return true;
-                next &= ~lowTable[highestBitPosition(contact)];
-                next = nextHighestBit(next);
-            }
-        }
-        return false;
+    public static long rookMove(int position, long pieces) {
+        return (RATT1(position, pieces) | RATT2(position, pieces));
+    }
+
+    public static long bishopMove(int position, long pieces) {
+        return (BATT3(position, pieces) | BATT4(position, pieces));
+    }
+
+    public static long queenMove(int position, long pieces) {
+        return (RATT1(position, pieces) | RATT2(position, pieces) | BATT3(position, pieces) | BATT4(position, pieces));
     }
 }

@@ -2,18 +2,17 @@ package com.fmotech.chess.utils;
 
 import com.fmotech.chess.Board;
 import com.fmotech.chess.ai.mediocre.MediocreBoard;
-import com.fmotech.chess.ai.mediocre.MediocreBoardEvaluation;
-import com.fmotech.chess.ai.mediocre.MediocreBoardEvaluation.EvalDetail;
+import com.fmotech.chess.ai.MediocreBoardEvaluation;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
-import static com.fmotech.chess.ai.mediocre.MediocreBoardEvaluation.drawProbabilityEnding;
-import static com.fmotech.chess.ai.mediocre.MediocreBoardEvaluation.drawProbabilityMiddle;
-import static com.fmotech.chess.ai.mediocre.MediocreBoardEvaluation.evalDetail;
-import static com.fmotech.chess.ai.mediocre.MediocreBoardEvaluation.gamePhase;
-import static com.fmotech.chess.ai.mediocre.MediocreBoardEvaluation.gamePhaseScale;
+import static com.fmotech.chess.ai.MediocreBoardEvaluation.drawProbabilityEnding;
+import static com.fmotech.chess.ai.MediocreBoardEvaluation.drawProbabilityMiddle;
+import static com.fmotech.chess.ai.MediocreBoardEvaluation.evalDetail;
+import static com.fmotech.chess.ai.MediocreBoardEvaluation.gamePhase;
+import static com.fmotech.chess.ai.MediocreBoardEvaluation.gamePhaseScale;
 
 public class ScoreStats {
 

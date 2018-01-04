@@ -200,7 +200,7 @@ public class Board {
 
     public int type(int pos, int castle, int enPassant) {
         int type = (int) (((b3 >>> pos) & 1) << 2 | ((b2 >>> pos) & 1) << 1 | ((b1 >>> pos) & 1));
-        return type != SPECIAL ? type : ((1 << pos) & CASTLE) != 0 ? castle : enPassant;
+        return type != SPECIAL ? type : ((1L << pos) & CASTLE) != 0 ? castle : enPassant;
     }
 
     public int type(long bit) {
@@ -287,11 +287,11 @@ public class Board {
     }
 
     public long ownRooksQueens() {
-        return ~b4 & (rooks() | queens());
+        return ~b4 & rooksQueens();
     }
 
     public long ownBishopsQueens() {
-        return ~b4 & (bishops() | queens());
+        return ~b4 & bishopsQueens();
     }
 
     // Enemy pieces
@@ -329,11 +329,11 @@ public class Board {
     }
 
     public long enemyRooksQueens() {
-        return b4 & (rooks() | queens());
+        return b4 & rooksQueens();
     }
 
     public long enemyBishopsQueens() {
-        return b4 & (bishops() | queens());
+        return b4 & bishopsQueens();
     }
 
     public long enemyEnPassantPawn() {

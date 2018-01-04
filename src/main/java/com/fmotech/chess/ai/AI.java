@@ -9,10 +9,11 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.Arrays;
 
+import static com.fmotech.chess.BitOperations.lowestBitPosition;
 import static com.fmotech.chess.FenFormatter.moveToFen;
-import static com.fmotech.chess.Move.MOVE_PROMO;
 import static com.fmotech.chess.Move.scoreMvvLva;
-import static com.fmotech.chess.MoveGenerator.isInCheck;
+import static com.fmotech.chess.MoveGenerator.attackingPieces;
+import static com.fmotech.chess.MoveGenerator.pinnedPieces;
 import static com.fmotech.chess.ai.PvData.ALPHA;
 import static com.fmotech.chess.ai.PvData.BETA;
 import static com.fmotech.chess.ai.PvData.EXACT;
@@ -113,8 +114,10 @@ public class AI {
         long hash = board.hash();
         boolean open = visited.contains(hash);
 
-        boolean inCheck = isInCheck(board);
-        if (inCheck)
+        int king = lowestBitPosition(board.ownKing());
+        long check = attackingPieces(king, board);
+        long pin = pinnedPieces(king, board);
+        if (check != 0)
             depth += 1;
 
         long data = table.get(hash);
@@ -127,7 +130,7 @@ public class AI {
                 return beta;
         }
 
-        if (AIOptions.allowNullMove && allowNull && !inCheck && hasMajorPieces(board) && depth >= 4) {
+        if (AIOptions.allowNullMove && allowNull && check == 0 && hasMajorPieces(board) && depth >= 4) {
             int score = -alphaBeta(-beta, -beta + 1, depth - 4, board.nextTurn(), false);
             if (score >= beta)
                 return beta;
@@ -135,9 +138,8 @@ public class AI {
 
         int pvMove = PvData.move(data);
 
-        int[] moves = board.moves();
-        int c = MoveGenerator.generateDirtyMoves(board, moves);
-        sortMoves(c, moves, ply, pvMove, killers.getPrimaryKiller(ply), killers.getSecundaryKiller(ply));
+        int[] moves = MoveGenerator.generate(king, check, pin, true, true, true, board);
+        sortMoves(moves, ply, pvMove, killers.getPrimaryKiller(ply), killers.getSecundaryKiller(ply));
 
         int legal = 0;
         int oldAlpha = alpha;
@@ -146,13 +148,9 @@ public class AI {
         int bestScore = -INFINITE;
 
         visited.add(hash);
-        for (int i = 0; i < c; i++) {
-            Board next = board.move(moves[i]);
-            if (!MoveGenerator.isValid(next))
-                continue;
-
+        for (int i = 1; i < moves[0]; i++) {
             legal += 1;
-            int score = -alphaBeta(-beta, -alpha, depth - 1, next.nextTurn(), true);
+            int score = -alphaBeta(-beta, -alpha, depth - 1, board.move(moves[i]).nextTurn(), true);
 
             if (score >= beta) {
                 if (!Move.isCapture(moves[i])) killers.addKiller(board.ply(), moves[i]);
@@ -172,7 +170,7 @@ public class AI {
         if (!open) visited.remove(hash);
 
         if (legal == 0) {
-            return inCheck ? -INFINITE + ply : 0;
+            return check != 0 ? -INFINITE + ply : 0;
         }
 
         if (alpha != oldAlpha)
@@ -196,26 +194,30 @@ public class AI {
         if (isDraw(board))
             return 0;
 
-        int score = evaluation.evaluateBoardPosition(board, alpha, beta);
+        int score;
+        try {
+            score = evaluation.evaluateBoardPosition(board, alpha, beta);
+        } catch (Exception e) {
+            System.out.println(board);
+            throw e;
+        }
         if (score >= beta)
             return beta;
 
         if (score > alpha)
             alpha = score;
 
-        int[] moves = board.moves();
-        int c = AIOptions.allowCheckEvasions && isInCheck(board) ? MoveGenerator.generateDirtyMoves(board, moves) : MoveGenerator.generateDirtyCaptureMoves(board, moves);
+        int king = lowestBitPosition(board.ownKing());
+        long check = attackingPieces(king, board);
+        long pin = pinnedPieces(king, board);
+        int[] moves = MoveGenerator.generate(king, check, pin, true, false, false, board);
+        sortQuiscentMoves(moves);
 
-        sortQuiscentMoves(c, moves);
-        for (int i = 0; i < c; i++) {
+        for (int i = 1; i < moves[i]; i++) {
             if (Move.evalCapture(moves[i]) < 0 && See.see(board, moves[i]) < 0)
                 continue;
 
-            Board next = board.move(moves[i]);
-            if (!MoveGenerator.isValid(next))
-                continue;
-
-            score = -quiescence(-beta, -alpha, next.nextTurn());
+            score = -quiescence(-beta, -alpha, board.move(moves[i]).nextTurn());
 
             if (score >= beta)
                 return beta;
@@ -235,8 +237,8 @@ public class AI {
     }
 
     static long[] scoredMoves = new long[256];
-    private void sortMoves(int size, int[] moves, int ply, int pv, int k1, int k2) {
-        for (int i = 0; i < size; i++) {
+    private void sortMoves(int[] moves, int ply, int pv, int k1, int k2) {
+        for (int i = 1; i < moves[0]; i++) {
             int score = 0;
             if (moves[i] == pv)
                 score = -100000000;
@@ -246,25 +248,25 @@ public class AI {
                 score = -1000000;
             else if (moves[i] == k2)
                 score = -999999;
-            else if (Move.hasFlag(moves[i], MOVE_PROMO))
+            else if (Move.promotion(moves[i]) != 0)
                 score = -(999900 + Move.promotion(moves[i]));
             else
                 score = -history.scoreMove(ply, moves[i]);
             scoredMoves[i] = BitOperations.joinInts(score, moves[i]);
         }
-        Arrays.sort(scoredMoves, 0, size);
-        for (int i = 0; i < size; i++) {
+        Arrays.sort(scoredMoves, 1, moves[0]);
+        for (int i = 1; i < moves[0]; i++) {
             moves[i] = BitOperations.lowInt(scoredMoves[i]);
         }
     }
 
-    private void sortQuiscentMoves(int size, int[] moves) {
-        for (int i = 0; i < size; i++) {
+    private void sortQuiscentMoves(int[] moves) {
+        for (int i = 1; i < moves[0]; i++) {
             int score = -scoreMvvLva(moves[i]);
             scoredMoves[i] = BitOperations.joinInts(score, moves[i]);
         }
-        Arrays.sort(scoredMoves, 0, size);
-        for (int i = 0; i < size; i++) {
+        Arrays.sort(scoredMoves, 1, moves[0]);
+        for (int i = 1; i < moves[0]; i++) {
             moves[i] = BitOperations.lowInt(scoredMoves[i]);
         }
     }

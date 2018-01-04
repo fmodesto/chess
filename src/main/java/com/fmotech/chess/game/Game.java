@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 
 import static com.fmotech.chess.FenFormatter.moveFromFen;
 import static com.fmotech.chess.FenFormatter.moveToFen;
-import static com.fmotech.chess.MoveGenerator.isInCheck;
+import static com.fmotech.chess.MoveGenerator.generateMoves;
 import static com.fmotech.chess.SanFormatter.moveFromSan;
 import static org.apache.commons.lang3.StringUtils.normalizeSpace;
 import static org.apache.commons.lang3.StringUtils.trim;
@@ -128,7 +128,7 @@ public class Game {
     }
 
     public boolean isGameOver() {
-        if (MoveGenerator.generateValidMoves(board, board.moves()) == 0) {
+        if (generateMoves(board)[0] == 1) {
             return true;
         } else if (board.fifty() >= 100) {
             return true;
@@ -141,8 +141,8 @@ public class Game {
     }
 
     public String result() {
-        if (MoveGenerator.generateValidMoves(board, board.moves()) == 0) {
-            if (isInCheck(board))
+        if (generateMoves(board)[0] == 1) {
+            if (MoveGenerator.isInCheck(board))
                 return (board.whiteTurn() ? "0-1 {black" : "1-0 {white") + " mates (claimed by Chessy)}";
             else
                 return "1/2-1/2 {stalemate (claimed by Chessy)}";

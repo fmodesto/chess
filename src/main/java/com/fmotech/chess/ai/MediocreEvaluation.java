@@ -2,7 +2,6 @@ package com.fmotech.chess.ai;
 
 import com.fmotech.chess.Board;
 import com.fmotech.chess.ai.mediocre.MediocreBoard;
-import com.fmotech.chess.ai.mediocre.MediocreBoardEvaluation;
 
 public class MediocreEvaluation implements Evaluation {
 

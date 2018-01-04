@@ -1,6 +1,4 @@
-package com.fmotech.chess.fast;
-
-import com.fmotech.chess.DebugUtils;
+package com.fmotech.chess;
 
 import static com.fmotech.chess.BitOperations.rotateLeft;
 

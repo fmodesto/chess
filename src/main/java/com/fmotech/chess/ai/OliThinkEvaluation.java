@@ -1,18 +1,18 @@
-package com.fmotech.chess.ai.mediocre;
+package com.fmotech.chess.ai;
 
 import com.fmotech.chess.Board;
+import com.fmotech.chess.MoveGenerator;
 import com.fmotech.chess.MoveTables;
-import com.fmotech.chess.Moves;
 import com.fmotech.chess.ai.Evaluation;
 
 import static com.fmotech.chess.BitOperations.bitCount;
 import static com.fmotech.chess.BitOperations.lowestBitPosition;
 import static com.fmotech.chess.BitOperations.sparseBitCount;
-import static com.fmotech.chess.Moves.BATT3;
-import static com.fmotech.chess.Moves.BATT4;
-import static com.fmotech.chess.Moves.RATT1;
-import static com.fmotech.chess.Moves.RATT2;
-import static com.fmotech.chess.ai.EvaluationUtils.pinnedPieces;
+import static com.fmotech.chess.MoveGenerator.pinnedPieces;
+import static com.fmotech.chess.MoveTables.BATT3;
+import static com.fmotech.chess.MoveTables.BATT4;
+import static com.fmotech.chess.MoveTables.RATT1;
+import static com.fmotech.chess.MoveTables.RATT2;
 
 public class OliThinkEvaluation implements Evaluation {
 
@@ -117,10 +117,10 @@ public class OliThinkEvaluation implements Evaluation {
     public int eval(int c, Board board) {
         int sf0 = 0, sf1 = 0;
         sfp[0] = sf0;
-        int ev0 = evalc(0, sfp, pinnedPieces(board, board.ownPieces()));
+        int ev0 = evalc(0, sfp, pinnedPieces(kingpos[0], board, colorb[0], colorb[1]));
         sf0 = sfp[0];
         sfp[0] = sf1;
-        int ev1 = evalc(1, sfp, pinnedPieces(board, board.enemyPieces()));
+        int ev1 = evalc(1, sfp, pinnedPieces(kingpos[1], board, colorb[1], colorb[0]));
         sf1 = sfp[0];
 
         if (sf1 < 6) ev0 += kmobil[kingpos[0]]*(6-sf1);
@@ -136,7 +136,7 @@ public class OliThinkEvaluation implements Evaluation {
         int oc = c^1;
         long ocb = colorb[oc];
         long m, b, a, cb;
-        long kn = MoveTables.KING_TABLE[kingpos[oc]];
+        long kn = MoveTables.KING[kingpos[oc]];
 
         b = pieceb[PAWN] & colorb[c];
         while (b != 0) {
@@ -144,8 +144,8 @@ public class OliThinkEvaluation implements Evaluation {
             f = lowestBitPosition(b);
             b ^= BIT(f);
             ppos = pawnprg[c][f];
-            m = (c == 0 ? MoveTables.PAWN_HIGH_TABLE : MoveTables.PAWN_LOW_TABLE)[f];
-            a = (c == 0 ? MoveTables.PAWN_ATTACK_HIGH_TABLE : MoveTables.PAWN_ATTACK_LOW_TABLE)[f];
+            m = BIT(c == 0 ? f + 8 : f - 8) & ~(colorb[0] | colorb[1]);
+            a = MoveTables.PAWN_ATTACK[c][f];
             if ((a & kn) != 0) katt += sparseBitCount(a & kn) << 4;
             if ((BIT(f) & pin) != 0) {
                 if ((getDir(f, kingpos[c]) & 16) == 0) m = 0;

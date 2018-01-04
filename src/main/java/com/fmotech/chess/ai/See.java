@@ -2,21 +2,17 @@ package com.fmotech.chess.ai;
 
 import com.fmotech.chess.Board;
 import com.fmotech.chess.Move;
+import com.fmotech.chess.MoveTables;
 
 import static com.fmotech.chess.BitOperations.lowestBit;
 import static com.fmotech.chess.Board.KNIGHT;
-import static com.fmotech.chess.Board.PAWN;
-import static com.fmotech.chess.Move.MOVE_EP_CAP;
-import static com.fmotech.chess.Move.hasFlag;
+import static com.fmotech.chess.Board.ROOK;
+import static com.fmotech.chess.Board.SPECIAL;
 import static com.fmotech.chess.Move.srcType;
-import static com.fmotech.chess.MoveTables.KING_TABLE;
-import static com.fmotech.chess.MoveTables.KNIGHT_TABLE;
-import static com.fmotech.chess.MoveTables.PAWN_ATTACK_HIGH_TABLE;
-import static com.fmotech.chess.MoveTables.PAWN_ATTACK_LOW_TABLE;
-import static com.fmotech.chess.Moves.BATT3;
-import static com.fmotech.chess.Moves.BATT4;
-import static com.fmotech.chess.Moves.RATT1;
-import static com.fmotech.chess.Moves.RATT2;
+import static com.fmotech.chess.MoveTables.BATT3;
+import static com.fmotech.chess.MoveTables.BATT4;
+import static com.fmotech.chess.MoveTables.RATT1;
+import static com.fmotech.chess.MoveTables.RATT2;
 
 public class See {
 
@@ -36,8 +32,10 @@ public class See {
 
         int depth = 0;
 
-        long pieces = hasFlag(move, MOVE_EP_CAP) ? board.pieces() ^ (tgt >>> 8) : board.pieces() ^ tgt;
-        gain[depth] = hasFlag(move, MOVE_EP_CAP) ? value[PAWN] : value[board.type(tgt)];
+        boolean enPassant = board.type(tgtPos, ROOK, SPECIAL) == SPECIAL;
+        long pieces = enPassant ? board.pieces() ^ board.enemyEnPassantPawn() : board.pieces() ^ tgt;
+
+        gain[depth] = value[Move.tgtType(move)];
         int type = srcType(move);
 
         long attackers = attackersTo(board, tgtPos, pieces);
@@ -68,12 +66,12 @@ public class See {
 
     private static long attackersTo(Board board, int pos, long pieces) {
         long attackers = 0;
-        attackers |= (board.enemyPawns() & PAWN_ATTACK_HIGH_TABLE[pos]);
-        attackers |= (board.ownPawns() & PAWN_ATTACK_LOW_TABLE[pos]);
-        attackers |= board.knights() & KNIGHT_TABLE[pos];
-        attackers |= board.kings() & KING_TABLE[pos];
-        attackers |= (board.rooks() | board.queens()) & (RATT1(pos, pieces) | RATT2(pos, pieces));
-        attackers |= (board.bishops() | board.queens()) & (BATT3(pos, pieces) | BATT4(pos, pieces));
+        attackers |= (board.enemyPawns() & MoveTables.PAWN_ATTACK[0][pos]);
+        attackers |= (board.ownPawns() & MoveTables.PAWN_ATTACK[1][pos]);
+        attackers |= board.knights() & MoveTables.KNIGHT[pos];
+        attackers |= board.kings() & MoveTables.KING[pos];
+        attackers |= (board.rooksQueens()) & (RATT1(pos, pieces) | RATT2(pos, pieces));
+        attackers |= (board.bishopsQueens()) & (BATT3(pos, pieces) | BATT4(pos, pieces));
         return attackers & pieces;
     }
 

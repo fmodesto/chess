@@ -1,4 +1,4 @@
-package com.fmotech.chess.fast;
+package com.fmotech.chess;
 
 public class Utils {
     public static final String SYMBOLS = "··PNBRQK";

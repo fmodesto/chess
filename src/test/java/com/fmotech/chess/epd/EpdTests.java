@@ -3,6 +3,7 @@ package com.fmotech.chess.epd;
 
 import com.fmotech.chess.ai.AI;
 import org.junit.Assume;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -19,13 +20,13 @@ import static org.junit.Assert.assertEquals;
 @RunWith(Parameterized.class)
 public class EpdTests {
 
-    public static final int TIME = 1000;
+    public static final int TIME = 100;
     public static final int EXECUTE = -1;
     private final EpdReader.Epd epd;
 
     @Parameterized.Parameters
     public static List<Object[]> data() {
-        List<Object[]> tests = EpdReader.read(Paths.get("src/test/resources/bk.epd"))
+        List<Object[]> tests = EpdReader.read(Paths.get("src/test/resources/wacnew.epd"))
                 .map(e -> new Object[]{e})
                 .collect(Collectors.toList());
         return EXECUTE < 0 ? tests : Collections.singletonList(tests.get(EXECUTE));

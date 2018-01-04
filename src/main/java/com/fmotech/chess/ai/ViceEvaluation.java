@@ -12,7 +12,6 @@ import static com.fmotech.chess.ai.EvaluationUtils.ENEMY_SIDE;
 import static com.fmotech.chess.ai.EvaluationUtils.OWN_SIDE;
 import static com.fmotech.chess.ai.EvaluationUtils.PAWN_ISOLATED_TABLE;
 import static com.fmotech.chess.ai.EvaluationUtils.PAWN_PASSED_TABLE;
-import static com.fmotech.chess.ai.EvaluationUtils.file;
 import static com.fmotech.chess.ai.EvaluationUtils.rank;
 import static com.fmotech.chess.ai.EvaluationUtils.toBoardPosition;
 
