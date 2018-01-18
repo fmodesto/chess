@@ -33,7 +33,7 @@ public class KoggeStone {
         return gen;
     }
 
-    private static long shiftOne(long b, int dir8) {
+    public static long shiftOne(long b, int dir8) {
         int r = SHIFT[dir8]; // {+-1,7,8,9}
         return rotateLeft(b, r) & AVOID_WRAP[dir8];
     }

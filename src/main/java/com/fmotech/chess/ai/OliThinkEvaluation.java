@@ -3,276 +3,150 @@ package com.fmotech.chess.ai;
 import com.fmotech.chess.Board;
 import com.fmotech.chess.MoveGenerator;
 import com.fmotech.chess.MoveTables;
-import com.fmotech.chess.ai.Evaluation;
+import com.fmotech.chess.Utils;
 
 import static com.fmotech.chess.BitOperations.bitCount;
+import static com.fmotech.chess.BitOperations.highInt;
+import static com.fmotech.chess.BitOperations.joinInts;
+import static com.fmotech.chess.BitOperations.lowInt;
 import static com.fmotech.chess.BitOperations.lowestBitPosition;
+import static com.fmotech.chess.BitOperations.nextLowestBit;
+import static com.fmotech.chess.BitOperations.northFill;
+import static com.fmotech.chess.BitOperations.southFill;
 import static com.fmotech.chess.BitOperations.sparseBitCount;
+import static com.fmotech.chess.KoggeStone.E;
+import static com.fmotech.chess.KoggeStone.N;
+import static com.fmotech.chess.KoggeStone.NE;
+import static com.fmotech.chess.KoggeStone.NW;
+import static com.fmotech.chess.KoggeStone.S;
+import static com.fmotech.chess.KoggeStone.SE;
+import static com.fmotech.chess.KoggeStone.SW;
+import static com.fmotech.chess.KoggeStone.W;
+import static com.fmotech.chess.KoggeStone.shiftOne;
 import static com.fmotech.chess.MoveGenerator.pinnedPieces;
-import static com.fmotech.chess.MoveTables.BATT3;
-import static com.fmotech.chess.MoveTables.BATT4;
-import static com.fmotech.chess.MoveTables.RATT1;
-import static com.fmotech.chess.MoveTables.RATT2;
+import static com.fmotech.chess.MoveTables.DIR;
+import static com.fmotech.chess.MoveTables.MASK;
+import static com.fmotech.chess.Utils.BIT;
+import static com.fmotech.chess.Utils.RANK;
+import static com.fmotech.chess.Utils.TEST;
+import static java.util.Arrays.asList;
+import static java.util.stream.IntStream.range;
 
 public class OliThinkEvaluation implements Evaluation {
 
-    final static int PAWN = 1;
-    final static int KNIGHT = 2;
-    final static int KING = 3;
-    final static int BISHOP = 5;
-    final static int ROOK = 6;
-    final static int QUEEN = 7;
+    private static final int[] KNIGHT_MOBILITY = range(0, 64).map(i -> (bitCount(MoveTables.KNIGHT[i]) - 1) * 6).toArray();
+    private static final int[] KING_MOBILITY = range(0, 64).map(i -> (bitCount(MoveTables.KNIGHT[i]) / 2) * 2).toArray();
 
-    final static int[] nmobil = new int[64];
-    final static int[] kmobil = new int[64];
-    final static long[] nmoves = new long[64];
-    final static long[] kmoves = new long[64];
-    final static long[][] pawnfree = new long[2][64];
-    final static long[][] pawnfile = new long[2][64];
-    final static long[][] pawnhelp = new long[2][64];
-    final static int[][] pawnprg = new int[2][64];
-    final static int pval[] = {0, 100, 290, 0, 100, 310, 500, 950};
-
-    private static long BIT(int f) { return 1L << f; }
-    static boolean TEST(int f, long b) { return (BIT(f) & (b)) != 0; }
-
-    static void _init_shorts(long[] moves, int[] m) {
-        int i, j, n;
-        for (i = 0; i < 64; i++) {
-            for (j = 0; j < 8; j++) {
-                n = i + m[j];
-                if (n < 64 && n >= 0 && ((n & 7)-(i & 7))*((n & 7)-(i & 7)) <= 4) {
-                    moves[i] |= 1L << n;
-                }
-            }
-        }
-    }
-
-    static void _init_pawns(long[] freep, long[] filep, long[] helpp, int c) {
-        final int pawnrun[] = {0, 0, 1, 8, 16, 32, 64, 128};
-        int i, j;
-        for (i = 0; i < 64; i++) {
-            int rank = i/8;
-            int file = i&7;
-            int m = i + (c == 1 ? -8 : 8);
-            pawnprg[c][i] = pawnrun[c == 1 ? 7-rank : rank];
-            for (j = 0; j < 64; j++) {
-                int jrank = j/8;
-                int jfile = j&7;
-                int dfile = (jfile - file)*(jfile - file);
-                if (dfile > 1) continue;
-                if ((c == 1 && jrank < rank) || (c == 0 && jrank > rank)) {//The not touched half of the pawn
-                    if (dfile == 0) filep[i] |= BIT(j);
-                    freep[i] |= BIT(j);
-                } else if (dfile != 0 && (jrank - rank)*(jrank - rank) <= 1) {
-                    helpp[i] |= BIT(j);
-                }
-            }
-            if (m < 0 || m > 63) continue;
-            if (file > 0) {
-                m = i + (c == 1 ? -9 : 7);
-                if (m < 0 || m > 63) continue;
-            }
-            if (file < 7) {
-                m = i + (c == 1 ? -7 : 9);
-                if (m < 0 || m > 63) continue;
-            }
-        }
-    }
-
-    static {
-        final int[] _knight = {-17,-10,6,15,17,10,-6,-15};
-        final int[] _king = {-9,-1,7,8,9,1,-7,-8};
-
-        for (int i = 0; i < 64; i++) nmobil[i] = (bitCount(nmoves[i])-1)*6;
-        for (int i = 0; i < 64; i++) kmobil[i] = (bitCount(nmoves[i])/2)*2;
-
-        _init_shorts(nmoves, _knight);
-        _init_shorts(kmoves, _king);
-        _init_pawns(pawnfree[0], pawnfile[0], pawnhelp[0], 0);
-        _init_pawns(pawnfree[1], pawnfile[1], pawnhelp[1], 1);
-    }
-
-    private int[] kingpos = new int[2];
-    private long[] colorb = new long[2];
-    private long[] pieceb = new long[8];
+    private static final long[][] PAWN_FREE = new long[][] {
+            range(0, 64).mapToLong(Utils::BIT).map(b -> northFill(shiftOne(b, NW) | shiftOne(b, N) | shiftOne(b, NE))).toArray(),
+            range(0, 64).mapToLong(Utils::BIT).map(b -> southFill(shiftOne(b, SW) | shiftOne(b, S) | shiftOne(b, SE))).toArray() };
+    private static final long[][] PAWN_FILE = new long[][] {
+            range(0, 64).mapToLong(Utils::BIT).map(b -> northFill(shiftOne(b, N))).toArray(),
+            range(0, 64).mapToLong(Utils::BIT).map(b -> southFill(shiftOne(b, S))).toArray() };
+    private static final long[][] PAWN_HELP = new long[][] {
+            range(0, 64).mapToLong(Utils::BIT).map(b -> shiftOne(b, W) | shiftOne(b, SW) | shiftOne(b, SE) | shiftOne(b, E)).toArray(),
+            range(0, 64).mapToLong(Utils::BIT).map(b -> shiftOne(b, W) | shiftOne(b, NW) | shiftOne(b, NE) | shiftOne(b, E)).toArray() };
+    private static final int[][] PAWN_RUN = new int[][] {
+            range(0, 64).map(i -> asList(0, 0, 1, 8, 16, 32, 64, 128).get(RANK(i))).toArray(),
+            range(0, 64).map(i -> asList(0, 0, 1, 8, 16, 32, 64, 128).get(7 - RANK(i))).toArray() };
 
     @Override
     public int evaluateBoardPosition(Board board, int alpha, int beta) {
-        kingpos[0] = lowestBitPosition(board.ownKing());
-        kingpos[1] = lowestBitPosition(board.enemyKing());
-        colorb[0] = board.ownPieces();
-        colorb[1] = board.enemyPieces();
-        pieceb[PAWN] = board.pawns();
-        pieceb[KNIGHT] = board.knights();
-        pieceb[BISHOP] = board.bishops();
-        pieceb[ROOK] = board.rooks();
-        pieceb[QUEEN] = board.queens();
-        pieceb[KING] = board.kings();
+        int ownKing = lowestBitPosition(board.ownKing());
+        int enemyKing = lowestBitPosition(board.enemyKing());
 
-        return eval(0, board);
+        long dataWhite = evaluateSide(board, 0, ownKing, enemyKing, board.ownPieces(), board.enemyPieces());
+        int pieceWhite = highInt(dataWhite);
+        int evaluationWhite = lowInt(dataWhite);
+
+        long dataBlack = evaluateSide(board, 1, enemyKing, ownKing, board.enemyPieces(), board.ownPieces());
+        int pieceBlack = highInt(dataBlack);
+        int evaluationBlack = lowInt(dataBlack);
+
+        if (pieceBlack < 6) evaluationWhite += KING_MOBILITY[ownKing] * (6 - pieceBlack);
+        if (pieceWhite < 6) evaluationBlack += KING_MOBILITY[enemyKing] * (6 - pieceWhite);
+
+        return evaluationWhite - evaluationBlack;
     }
 
-    private int[] sfp = new int[1];
-    public int eval(int c, Board board) {
-        int sf0 = 0, sf1 = 0;
-        sfp[0] = sf0;
-        int ev0 = evalc(0, sfp, pinnedPieces(kingpos[0], board, colorb[0], colorb[1]));
-        sf0 = sfp[0];
-        sfp[0] = sf1;
-        int ev1 = evalc(1, sfp, pinnedPieces(kingpos[1], board, colorb[1], colorb[0]));
-        sf1 = sfp[0];
+    static long evaluateSide(Board board, int side, int ownKing, int enemyKing, long own, long enemy) {
+        int pieceValue = 0;
+        int mobility = 0;
+        int kingAttack = 0;
 
-        if (sf1 < 6) ev0 += kmobil[kingpos[0]]*(6-sf1);
-        if (sf0 < 6) ev1 += kmobil[kingpos[1]]*(6-sf0);
+        long kingSurrounds = MoveTables.KING[enemyKing];
+        long pin = pinnedPieces(ownKing, board, own, enemy);
 
-        return (c != 0 ? (ev1 - ev0) : (ev0 - ev1));
-    }
+        long pieces = own | enemy;
 
-    /* The evaluation for Color c. It's only mobility stuff. Pinned pieces are still awarded for limiting opposite's king */
-    private int evalc(int c, int[] sf, long pin) {
-        int f;
-        int mn = 0, katt = 0;
-        int oc = c^1;
-        long ocb = colorb[oc];
-        long m, b, a, cb;
-        long kn = MoveTables.KING[kingpos[oc]];
-
-        b = pieceb[PAWN] & colorb[c];
-        while (b != 0) {
-            int ppos = 0;
-            f = lowestBitPosition(b);
-            b ^= BIT(f);
-            ppos = pawnprg[c][f];
-            m = BIT(c == 0 ? f + 8 : f - 8) & ~(colorb[0] | colorb[1]);
-            a = MoveTables.PAWN_ATTACK[c][f];
-            if ((a & kn) != 0) katt += sparseBitCount(a & kn) << 4;
-            if ((BIT(f) & pin) != 0) {
-                if ((getDir(f, kingpos[c]) & 16) == 0) m = 0;
+        long next = board.pawns() & own;
+        while (next != 0) {
+            int from = lowestBitPosition(next);
+            int ppos = PAWN_RUN[side][from];
+            long m = BIT(from + (side == 1 ? -8 : 8)) & ~pieces;
+            long attack = MoveTables.PAWN_ATTACK[side][from] & pieces;
+            if ((attack & kingSurrounds) != 0) kingAttack += sparseBitCount(attack & kingSurrounds) << 4;
+            if (TEST(from, pin)) {
+                if (DIR(from, ownKing) != 2) m = 0;
             } else {
-                ppos += sparseBitCount(a & pieceb[PAWN] & colorb[c]) << 2;
+                ppos += sparseBitCount(attack & board.pawns() & own) << 2;
             }
             if (m != 0) ppos += 8; else ppos -= 8;
-            if ((pawnfile[c][f] & pieceb[PAWN] & ocb) == 0) { //Free file?
-                if ((pawnfree[c][f] & pieceb[PAWN] & ocb) == 0) ppos *= 2; //Free run?
-                if ((pawnhelp[c][f] & pieceb[PAWN] & colorb[c]) == 0) ppos -= 33; //Hanging backpawn?
+            if ((PAWN_FILE[side][from] & board.pawns() & enemy) == 0) { //Free file?
+                if ((PAWN_FREE[side][from] & board.pawns() & enemy) == 0) ppos *= 2; //Free run?
+                if ((PAWN_HELP[side][from] & board.pawns() & own) == 0) ppos -= 33; //Hanging backpawn?
             }
-
-            mn += ppos;
+            mobility += ppos;
+            next = nextLowestBit(next);
         }
 
-        cb = colorb[c] & (~pin);
-        b = pieceb[KNIGHT] & cb;
-        while (b != 0) {
-            sf[0] += 1;
-            f = lowestBitPosition(b);
-            b ^= BIT(f);
-            a = nmoves[f];
-            if ((a & kn) != 0) katt += sparseBitCount(a & kn) << 4;
-            mn += nmobil[f];
+        next = board.knights() & own;
+        while (next != 0) {
+            pieceValue += 1;
+            int from = lowestBitPosition(next);
+            long attack = MoveTables.KNIGHT[from];
+            if ((attack & kingSurrounds) != 0) kingAttack += sparseBitCount(attack & kingSurrounds) << 4;
+            if (!TEST(from, pin)) mobility += KNIGHT_MOBILITY[from];
+            next = nextLowestBit(next);
         }
 
-        b = pieceb[KNIGHT] & pin;
-        while (b != 0) {
-            sf[0] += 1;
-            f = lowestBitPosition(b);
-            b ^= BIT(f);
-            a = nmoves[f];
-            if ((a & kn) != 0) katt += sparseBitCount(a & kn) << 4;
+        pieces ^= BIT(enemyKing); //Opposite King doesn't block mobility at all
+        next = board.queens() & own;
+        while (next != 0) {
+            pieceValue += 4;
+            int from = lowestBitPosition(next);
+            long attack = MoveGenerator.queenMove(from, pieces);
+            if ((attack & kingSurrounds) != 0) kingAttack += sparseBitCount(attack & kingSurrounds) << 4;
+            mobility += TEST(from, pin) ? bitCount(attack & MASK(from, ownKing)) : bitCount(attack);
+            next = nextLowestBit(next);
         }
 
-        colorb[oc] ^= BIT(kingpos[oc]); //Opposite King doesn't block mobility at all
-        b = pieceb[QUEEN] & cb;
-        while (b != 0) {
-            sf[0] += 4;
-            f = lowestBitPosition(b);
-            b ^= BIT(f);
-            long occupied = colorb[0] | colorb[1];
-            a = RATT1(f, occupied) | RATT2(f, occupied) | BATT3(f, occupied) | BATT4(f, occupied);
-            if ((a & kn) != 0) katt += sparseBitCount(a & kn) << 4;
-            mn += bitCount(a);
+        pieces ^= board.rooksQueens() & enemy; //Opposite Queen & Rook doesn't block mobility for bishop
+        next = board.bishops() & own;
+        while (next != 0) {
+            pieceValue += 1;
+            int from = lowestBitPosition(next);
+            long attack = MoveGenerator.bishopMove(from, pieces);
+            if ((attack & kingSurrounds) != 0) kingAttack += sparseBitCount(attack & kingSurrounds) << 4;
+            mobility += TEST(from, pin) ? bitCount(attack & MASK(from, ownKing)) : bitCount(attack) << 3;
+            next = nextLowestBit(next);
         }
 
-        colorb[oc] ^= (pieceb[QUEEN] | pieceb[ROOK]) & ocb; //Opposite Queen & Rook doesn't block mobility for bishop
-        b = pieceb[BISHOP] & cb;
-        while (b != 0) {
-            sf[0] += 1;
-            f = lowestBitPosition(b);
-            b ^= BIT(f);
-            long occupied = colorb[0] | colorb[1];
-            a = BATT3(f, occupied) | BATT4(f, occupied);
-            if ((a & kn) != 0) katt += sparseBitCount(a & kn) << 4;
-            mn += bitCount(a) << 3;
+        pieces ^= board.rooks() & enemy; //Opposite Queen doesn't block mobility for rook.
+        pieces ^= board.rooks() & own & ~pin; //Own non-pinned Rook doesn't block mobility for rook.
+        next = board.rooks() & own;
+        while (next != 0) {
+            pieceValue += 2;
+            int from = lowestBitPosition(next);
+            long attack = MoveGenerator.rookMove(from, pieces);
+            if ((attack & kingSurrounds) != 0) kingAttack += sparseBitCount(attack & kingSurrounds) << 4;
+            mobility += TEST(from, pin) ? bitCount(attack & MASK(from, ownKing)) : bitCount(attack) << 2;
+            next = nextLowestBit(next);
         }
 
-        colorb[oc] ^= pieceb[ROOK] & ocb; //Opposite Queen doesn't block mobility for rook.
-        colorb[c] ^= pieceb[ROOK] & cb; //Own non-pinned Rook doesn't block mobility for rook.
-        b = pieceb[ROOK] & cb;
-        while (b != 0) {
-            sf[0] += 2;
-            f = lowestBitPosition(b);
-            b ^= BIT(f);
-            long occupied = colorb[0] | colorb[1];
-            a = RATT1(f, 0) | RATT2(f, occupied);
-            if ((a & kn) != 0) katt += sparseBitCount(a & kn) << 4;
-            mn += bitCount(a) << 2;
-        }
-
-        colorb[c] ^= pieceb[ROOK] & cb; // Back
-        b = pin & (pieceb[ROOK] | pieceb[BISHOP] | pieceb[QUEEN]);
-        while (b != 0) {
-            f = lowestBitPosition(b);
-            b ^= BIT(f);
-            int p = identPiece(f);
-            long occupied = colorb[0] | colorb[1];
-            if (p == BISHOP) {
-                sf[0] += 1;
-                a = BATT3(f, occupied) | BATT4(f, occupied);
-                if ((a & kn) != 0) katt += sparseBitCount(a & kn) << 4;
-            } else if (p == ROOK) {
-                sf[0] += 2;
-                a = RATT1(f, occupied) | RATT2(f, occupied);
-                if ((a & kn) != 0) katt += sparseBitCount(a & kn) << 4;
-            } else {
-                sf[0] += 4;
-                a = RATT1(f, occupied) | RATT2(f, occupied) | BATT3(f, occupied) | BATT4(f, occupied);
-                if ((a & kn) != 0) katt += sparseBitCount(a & kn) << 4;
-            }
-            int t = p | getDir(f, kingpos[c]);
-            if ((t & 10) == 10) mn += bitCount(RATT1(f, occupied));
-            if ((t & 18) == 18) mn += bitCount(RATT2(f, occupied));
-            if ((t & 33) == 33) mn += bitCount(BATT3(f, occupied));
-            if ((t & 65) == 65) mn += bitCount(BATT4(f, occupied));
-        }
-
-        colorb[oc] ^= pieceb[QUEEN] & ocb; //Back
-        colorb[oc] ^= BIT(kingpos[oc]); //Back
-        if (sf[0] == 1 && (pieceb[PAWN] & colorb[c]) == 0) mn =- 200; //No mating material
-        if (sf[0] < 7) katt = katt * sf[0] / 7; //Reduce the bonus for attacking king squares
-        if (sf[0] < 2) sf[0] = 2;
-
-        int ma = 0;
-        ma += pval[PAWN] * bitCount(pieceb[PAWN] & colorb[c]);
-        ma += pval[KNIGHT] * bitCount(pieceb[KNIGHT] & colorb[c]);
-        ma += pval[BISHOP] * bitCount(pieceb[BISHOP] & colorb[c]);
-        ma += pval[ROOK] * bitCount(pieceb[ROOK] & colorb[c]);
-        ma += pval[QUEEN] * bitCount(pieceb[QUEEN] & colorb[c]);
-        return ma + mn + katt;
-    }
-
-    int identPiece(int f) {
-        if (TEST(f, pieceb[PAWN])) return PAWN;
-        if (TEST(f, pieceb[KNIGHT])) return KNIGHT;
-        if (TEST(f, pieceb[BISHOP])) return BISHOP;
-        if (TEST(f, pieceb[ROOK])) return ROOK;
-        if (TEST(f, pieceb[QUEEN])) return QUEEN;
-        if (TEST(f, pieceb[KING])) return KING;
-        return 0;
-    }
-
-    static byte getDir(int f, int t) {
-        if (((f ^ t) & 56) == 0) return 8;
-        if (((f ^ t) & 7) == 0) return 16;
-        return (byte)(((f - t) % 7) != 0 ? 32 : 64);
+        if (pieceValue == 1 && (board.pawns() & own) == 0) mobility = -200; //No mating material
+        if (pieceValue < 7) kingAttack = kingAttack * pieceValue / 7; //Reduce the bonus for attacking king squares
+        if (pieceValue < 2) pieceValue = 2;
+        return joinInts(pieceValue, mobility + kingAttack);
     }
 }
